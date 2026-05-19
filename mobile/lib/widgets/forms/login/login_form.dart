@@ -30,6 +30,7 @@ import 'package:immich_mobile/utils/version_compatibility.dart';
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:immich_mobile/widgets/common/immich_title_text.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
+import 'package:immich_mobile/widgets/swimmich/swimmich_bootstrap_dialog.dart';
 import 'package:immich_ui/immich_ui.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
@@ -254,9 +255,13 @@ class LoginForm extends HookConsumerWidget {
             }
             unawaited(handleSyncFlow());
             ref.read(websocketProvider.notifier).connect();
+            if (context.mounted) await runSwimmichBootstrap(context, ref);
+            if (!context.mounted) return;
             unawaited(context.replaceRoute(const TabShellRoute()));
             return;
           }
+          if (context.mounted) await runSwimmichBootstrap(context, ref);
+          if (!context.mounted) return;
           unawaited(context.replaceRoute(const TabControllerRoute()));
         }
       } catch (error) {
@@ -349,9 +354,13 @@ class LoginForm extends HookConsumerWidget {
                 await getManageMediaPermission();
               }
               unawaited(handleSyncFlow());
+              if (context.mounted) await runSwimmichBootstrap(context, ref);
+              if (!context.mounted) return;
               unawaited(context.replaceRoute(const TabShellRoute()));
               return;
             }
+            if (context.mounted) await runSwimmichBootstrap(context, ref);
+            if (!context.mounted) return;
             unawaited(context.replaceRoute(const TabControllerRoute()));
           }
         } catch (error, stack) {
