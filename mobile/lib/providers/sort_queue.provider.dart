@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:logging/logging.dart';
@@ -54,25 +55,42 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   final _log = Logger('SortQueueNotifier');
 
   @override
-  Future<SortQueueState> build() => _load([]);
+  Future<SortQueueState> build() {
+    // Auto-rebuild (and reset to page 1) when the source filter changes.
+    ref.watch(sortSourceFilterProvider);
+    _page = 1;
+    return _load([]);
+  }
 
   // ─── Private helpers ─────────────────────────────────────────────────────
 
-  Future<String?> _newAlbumId() => ref
-      .read(secureStorageRepositoryProvider)
-      .read(SwimmichSystemAlbum.newAssets.storageKey);
+  Future<List<String>> _albumIds() async {
+    final filter = ref.read(sortSourceFilterProvider);
+    final storage = ref.read(secureStorageRepositoryProvider);
+    final ids = <String>[];
+    if (filter.contains(SortSource.newAssets)) {
+      final id = await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+      if (id != null) ids.add(id);
+    }
+    if (filter.contains(SortSource.reviewLater)) {
+      final id =
+          await storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+      if (id != null) ids.add(id);
+    }
+    return ids;
+  }
 
   Future<SortQueueState> _load(List<AssetResponseDto> existing) async {
-    final albumId = await _newAlbumId();
-    if (albumId == null) {
-      _log.warning('_New album id not found — bootstrap may not have run yet');
+    final albumIds = await _albumIds();
+    if (albumIds.isEmpty) {
+      _log.warning('No source album ids found — bootstrap may not have run yet');
       return const SortQueueState(assets: [], hasMore: false);
     }
 
     try {
       final resp = await ref.read(apiServiceProvider).searchApi.searchAssets(
             MetadataSearchDto(
-              albumIds: [albumId],
+              albumIds: albumIds,
               page: _page,
               size: _pageSize,
               withDeleted: false,
@@ -86,7 +104,7 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
         hasMore: resp.assets.nextPage != null,
       );
     } catch (e, st) {
-      _log.severe('Failed to load _New album assets', e, st);
+      _log.severe('Failed to load sort queue assets', e, st);
       rethrow;
     }
   }

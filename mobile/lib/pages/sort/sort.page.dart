@@ -13,6 +13,7 @@ import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
+import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
@@ -58,31 +59,38 @@ class SortPage extends HookConsumerWidget {
     return Scaffold(
       appBar: const ImmichAppBar(showUploadButton: false),
       backgroundColor: Colors.black,
-      body: queueAsync.when(
-        loading: () => const _LoadingView(),
-        error: (e, _) =>
-            _ErrorView(error: e.toString(), onRetry: notifier.refresh),
-        data: (queue) => queue.current == null
-            ? _AllCaughtUpView(
-                onRefresh: () async {
-                  await ref
-                      .read(swimmichBootstrapServiceProvider)
-                      .checkForNewAssets();
-                  await notifier.refresh();
-                },
-              )
-            : Column(
-                children: [
-                  Expanded(
-                    child: _SortDeckView(
-                      asset: queue.current!,
-                      remaining: queue.remaining,
-                      nextAsset: queue.nextAsset,
+      body: Column(
+        children: [
+          const _SourceFilterBar(),
+          Expanded(
+            child: queueAsync.when(
+              loading: () => const _LoadingView(),
+              error: (e, _) =>
+                  _ErrorView(error: e.toString(), onRetry: notifier.refresh),
+              data: (queue) => queue.current == null
+                  ? _AllCaughtUpView(
+                      onRefresh: () async {
+                        await ref
+                            .read(swimmichBootstrapServiceProvider)
+                            .checkForNewAssets();
+                        await notifier.refresh();
+                      },
+                    )
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: _SortDeckView(
+                            asset: queue.current!,
+                            remaining: queue.remaining,
+                            nextAsset: queue.nextAsset,
+                          ),
+                        ),
+                        const QuickPickRow(),
+                      ],
                     ),
-                  ),
-                  const QuickPickRow(),
-                ],
-              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -377,6 +385,11 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     await ref.read(sortQueueProvider.notifier).advance();
     if (!mounted) return;
 
+    // Capture values before setState resets _starRating.
+    final assetId = widget.asset.id;
+    final qpIds = ref.read(quickPickProvider).selected.toList();
+    final starRating = _starRating;
+
     // Reset visual state for the next card before the API call.
     setState(() {
       _drag = Offset.zero;
@@ -387,9 +400,6 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     _flyController.reset();
 
     // 3. Push undo record; show SnackBar only for delete.
-    final assetId = widget.asset.id;
-    final qpIds = ref.read(quickPickProvider).selected.toList();
-    final starRating = _starRating;
     final record = UndoRecord(
       asset: widget.asset,
       action: action,
@@ -610,6 +620,46 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             ),
           // Main (draggable) card on top.
           Positioned.fill(child: mainCard),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Source filter bar ───────────────────────────────────────────────────────
+
+class _SourceFilterBar extends ConsumerWidget {
+  const _SourceFilterBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filter = ref.watch(sortSourceFilterProvider);
+
+    void toggle(SortSource source) {
+      final current = ref.read(sortSourceFilterProvider);
+      if (current.contains(source) && current.length == 1) return;
+      final next = Set<SortSource>.from(current);
+      next.contains(source) ? next.remove(source) : next.add(source);
+      ref.read(sortSourceFilterProvider.notifier).state = next;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('New'),
+            selected: filter.contains(SortSource.newAssets),
+            onSelected: (_) => toggle(SortSource.newAssets),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('Review'),
+            selected: filter.contains(SortSource.reviewLater),
+            onSelected: (_) => toggle(SortSource.reviewLater),
+            visualDensity: VisualDensity.compact,
+          ),
         ],
       ),
     );

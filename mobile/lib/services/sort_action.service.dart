@@ -45,6 +45,9 @@ class SortActionService {
       case SortAction.delete:
         // Soft-delete (trash); force: false keeps it recoverable.
         await _assetRepo.delete([assetId], false);
+        final rlIdDel =
+            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        if (rlIdDel != null) await _albumRepo.removeAssets(rlIdDel, [assetId]);
         if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
 
       case SortAction.reviewLater:
@@ -54,9 +57,12 @@ class SortActionService {
         if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
 
       case SortAction.sorted:
-        final id =
-            await _storage.read(SwimmichSystemAlbum.sorted.storageKey);
-        if (id != null) await _albumRepo.addAssets(id, [assetId]);
+        // Remove from both source albums (photo may have come from either).
+        final rlIdSorted =
+            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        if (rlIdSorted != null) {
+          await _albumRepo.removeAssets(rlIdSorted, [assetId]);
+        }
         for (final qId in quickPickAlbumIds) {
           await _albumRepo.addAssets(qId, [assetId]);
         }
@@ -100,8 +106,6 @@ class SortActionService {
         if (newId != null) await _albumRepo.addAssets(newId, [record.asset.id]);
 
       case SortAction.sorted:
-        final id = await _storage.read(SwimmichSystemAlbum.sorted.storageKey);
-        if (id != null) await _albumRepo.removeAssets(id, [record.asset.id]);
         for (final qId in record.quickPickIds) {
           await _albumRepo.removeAssets(qId, [record.asset.id]);
         }
