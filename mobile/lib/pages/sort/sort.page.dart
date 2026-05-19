@@ -1,11 +1,29 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/presentation/sort/storage_badge.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
+import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
+import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
-import 'package:immich_mobile/widgets/common/immich_thumbnail.dart';
+import 'package:immich_mobile/providers/undo_stack.provider.dart';
+import 'package:immich_mobile/services/sort_action.service.dart';
+import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
+import 'package:immich_mobile/widgets/common/immich_app_bar.dart';
 import 'package:openapi/api.dart';
+
+AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
+      AssetTypeEnum.IMAGE => AssetType.image,
+      AssetTypeEnum.VIDEO => AssetType.video,
+      AssetTypeEnum.AUDIO => AssetType.audio,
+      _ => AssetType.other,
+    };
 
 @RoutePage()
 class SortPage extends HookConsumerWidget {
@@ -30,44 +48,57 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    return RefreshIndicator(
-      onRefresh: notifier.refresh,
-      child: CustomScrollView(
-        // CustomScrollView satisfies RefreshIndicator's Scrollable requirement.
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            child: queueAsync.when(
-              loading: () => const _LoadingView(),
-              error: (e, _) => _ErrorView(error: e.toString(), onRetry: notifier.refresh),
-              data: (queue) => queue.current == null
-                  ? _AllCaughtUpView(onRefresh: notifier.refresh)
-                  : _SortCardView(
+    // Ensure album names are available for quick-pick chip labels.
+    useEffect(() {
+      ref.read(remoteAlbumProvider.notifier).refresh();
+      return null;
+    }, const []);
+
+    return Scaffold(
+      appBar: const ImmichAppBar(showUploadButton: false),
+      backgroundColor: Colors.black,
+      body: queueAsync.when(
+        loading: () => const _LoadingView(),
+        error: (e, _) =>
+            _ErrorView(error: e.toString(), onRetry: notifier.refresh),
+        data: (queue) => queue.current == null
+            ? _AllCaughtUpView(
+                onRefresh: () async {
+                  await ref
+                      .read(swimmichBootstrapServiceProvider)
+                      .checkForNewAssets();
+                  await notifier.refresh();
+                },
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: _SortDeckView(
                       asset: queue.current!,
                       remaining: queue.remaining,
+                      nextAsset: queue.nextAsset,
                     ),
-            ),
-          ),
-        ],
+                  ),
+                  const QuickPickRow(),
+                ],
+              ),
       ),
     );
   }
 }
 
-// ─── Loading ────────────────────────────────────────────────────────────────
+// ─── Loading ─────────────────────────────────────────────────────────────────
 
 class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 }
 
-// ─── Error ──────────────────────────────────────────────────────────────────
+// ─── Error ───────────────────────────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.error, required this.onRetry});
@@ -77,40 +108,44 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                'Could not load photos',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Could not load photos',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ─── Empty state ────────────────────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _AllCaughtUpView extends StatelessWidget {
   const _AllCaughtUpView({required this.onRefresh});
@@ -119,89 +154,446 @@ class _AllCaughtUpView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('🎉', style: TextStyle(fontSize: 56)),
-              const SizedBox(height: 16),
-              Text(
-                'All caught up!',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No new photos to sort right now.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                onPressed: onRefresh,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Check again'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🎉', style: TextStyle(fontSize: 56)),
+            const SizedBox(height: 16),
+            Text(
+              'All caught up!',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No new photos to sort right now.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white60,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Check again'),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ─── Card ────────────────────────────────────────────────────────────────────
+// ─── Swipe-deck card ──────────────────────────────────────────────────────────
 
-class _SortCardView extends StatelessWidget {
-  const _SortCardView({required this.asset, required this.remaining});
+class _SortDeckView extends ConsumerStatefulWidget {
+  const _SortDeckView({
+    required this.asset,
+    required this.remaining,
+    this.nextAsset,
+  });
 
   final AssetResponseDto asset;
   final int remaining;
+  final AssetResponseDto? nextAsset;
+
+  @override
+  ConsumerState<_SortDeckView> createState() => _SortDeckViewState();
+}
+
+class _SortDeckViewState extends ConsumerState<_SortDeckView>
+    with TickerProviderStateMixin {
+  /// Current drag offset while the user is touching the screen.
+  Offset _drag = Offset.zero;
+
+  /// True while a fly-off or bounce-back animation is playing.
+  bool _isAnimating = false;
+
+  /// Prevents the haptic from firing on every frame at threshold.
+  bool _hapticFired = false;
+
+  /// Drives the card off-screen after a committed swipe.
+  late final AnimationController _flyController;
+  late Animation<Offset> _flyAnimation;
+
+  /// Snaps the card back to centre after a rejected drag.
+  late final AnimationController _bounceController;
+  late Animation<Offset> _bounceAnimation;
+
+  static const double _hThreshold = 90.0;
+  static const double _vThreshold = 70.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _flyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+  }
+
+  @override
+  void dispose() {
+    _flyController.dispose();
+    _bounceController.dispose();
+    super.dispose();
+  }
+
+  // ── Direction helpers ──────────────────────────────────────────────────────
+
+  SortAction? get _activeAction {
+    if (_drag.dy > _vThreshold && _drag.dy > _drag.dx.abs()) {
+      return SortAction.reviewLater;
+    }
+    if (_drag.dx > _hThreshold) return SortAction.sorted;
+    if (_drag.dx < -_hThreshold) return SortAction.delete;
+    return null;
+  }
+
+  Color? get _overlayColor {
+    final action = _activeAction;
+    if (action != null) {
+      return switch (action) {
+        SortAction.delete => Colors.red,
+        SortAction.sorted => Colors.green,
+        SortAction.reviewLater => Colors.amber,
+      };
+    }
+    if (_drag.dx < -20) return Colors.red;
+    if (_drag.dx > 20) return Colors.green;
+    if (_drag.dy > 20) return Colors.amber;
+    return null;
+  }
+
+  double get _overlayOpacity => (_drag.distance / 140).clamp(0.0, 0.55);
+  double get _rotation => _drag.dx / 700;
+
+  IconData get _directionIcon => switch (_activeAction) {
+        SortAction.delete => Icons.delete_rounded,
+        SortAction.reviewLater => Icons.schedule_rounded,
+        SortAction.sorted => Icons.check_circle_rounded,
+        null => _drag.dx < 0
+            ? Icons.delete_rounded
+            : _drag.dx > 0
+                ? Icons.check_circle_rounded
+                : Icons.schedule_rounded,
+      };
+
+  String get _directionLabel => switch (_activeAction) {
+        SortAction.delete => 'Delete',
+        SortAction.reviewLater => 'Later',
+        SortAction.sorted => 'Sort',
+        null => '',
+      };
+
+  // ── Gesture callbacks ──────────────────────────────────────────────────────
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_isAnimating) return;
+    setState(() => _drag += d.delta);
+    if (!_hapticFired && _activeAction != null) {
+      ref.read(hapticFeedbackProvider.notifier).mediumImpact();
+      _hapticFired = true;
+    }
+    if (_activeAction == null) _hapticFired = false;
+  }
+
+  void _onPanEnd(DragEndDetails _) {
+    final action = _activeAction;
+    if (action == null) {
+      _bounceBack();
+      return;
+    }
+    if (action == SortAction.sorted &&
+        ref.read(quickPickProvider).selected.isEmpty) {
+      _bounceBack();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Select an album chip below first'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+    _commitAction(action);
+  }
+
+  // ── Animations ─────────────────────────────────────────────────────────────
+
+  void _bounceBack() {
+    _bounceAnimation = Tween<Offset>(begin: _drag, end: Offset.zero).animate(
+      CurvedAnimation(parent: _bounceController, curve: Curves.elasticOut),
+    );
+    _isAnimating = true;
+    _bounceController
+      ..reset()
+      ..forward().then((_) {
+        if (mounted) {
+          setState(() {
+            _drag = Offset.zero;
+            _isAnimating = false;
+            _hapticFired = false;
+          });
+        }
+      });
+  }
+
+  Future<void> _commitAction(SortAction action) async {
+    final screenSize = MediaQuery.sizeOf(context);
+    final target = switch (action) {
+      SortAction.delete => Offset(-screenSize.width * 1.5, _drag.dy),
+      SortAction.sorted => Offset(screenSize.width * 1.5, _drag.dy),
+      SortAction.reviewLater => Offset(_drag.dx, screenSize.height * 1.5),
+    };
+
+    _flyAnimation = Tween<Offset>(begin: _drag, end: target).animate(
+      CurvedAnimation(parent: _flyController, curve: Curves.easeIn),
+    );
+    _isAnimating = true;
+    _flyController.reset();
+
+    // 1. Play fly-off animation.
+    await _flyController.forward();
+    if (!mounted) return;
+
+    // 2. Optimistically advance to the next card.
+    await ref.read(sortQueueProvider.notifier).advance();
+    if (!mounted) return;
+
+    // Reset visual state for the next card before the API call.
+    setState(() {
+      _drag = Offset.zero;
+      _isAnimating = false;
+      _hapticFired = false;
+    });
+    _flyController.reset();
+
+    // 3. Push undo record; show SnackBar only for delete.
+    final assetId = widget.asset.id;
+    final qpIds = ref.read(quickPickProvider).selected.toList();
+    final record =
+        UndoRecord(asset: widget.asset, action: action, quickPickIds: qpIds);
+    ref.read(undoStackProvider.notifier).push(record);
+
+    if (action == SortAction.delete && mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Photo deleted'),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(bottom: 160, left: 16, right: 16),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => _executeUndo(record),
+          ),
+        ),
+      );
+    }
+
+    // 4. Execute the API call (background; roll back on failure).
+    try {
+      await ref.read(sortActionServiceProvider).execute(
+            assetId,
+            action,
+            quickPickAlbumIds:
+                action == SortAction.sorted ? qpIds : const [],
+          );
+      if (action == SortAction.sorted && mounted) {
+        ref.read(quickPickProvider.notifier).recordUsage(qpIds);
+        ref.read(quickPickProvider.notifier).clearSelection();
+      }
+    } catch (e) {
+      ref.read(sortQueueProvider.notifier).revertAdvance();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Action failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _executeUndo(UndoRecord record) async {
+    ref.read(undoStackProvider.notifier).pop();
+    ref.read(sortQueueProvider.notifier).insertAtCurrent(record.asset);
+    try {
+      await ref.read(sortActionServiceProvider).undo(record);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Undo failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ── Peek card ──────────────────────────────────────────────────────────────
+
+  Widget _buildPeekCard(AssetResponseDto asset, Size size) {
+    final progress = (_drag.distance / 120).clamp(0.0, 1.0);
+    final scale = lerpDouble(0.94, 1.0, progress)!;
+    final yOffset = lerpDouble(14.0, 0.0, progress)!;
+    return Transform.translate(
+      offset: Offset(0, yOffset),
+      child: Transform.scale(
+        scale: scale,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image(
+            image: RemoteImageProvider.thumbnail(
+              assetId: asset.id,
+              thumbhash: asset.thumbhash ?? '',
+            ),
+            fit: BoxFit.contain,
+            width: size.width,
+            height: size.height,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final size = MediaQuery.sizeOf(context);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // ── Photo ──────────────────────────────────────────────────────
+    Widget mainCard = Stack(
+      children: [
+        // Solid background so portrait photos don't reveal the peek card.
+        const Positioned.fill(child: ColoredBox(color: Colors.black)),
+
+        // Photo — full preview quality with progressive loading.
+        Positioned.fill(
+          child: Image(
+            image: RemoteFullImageProvider(
+              assetId: widget.asset.id,
+              thumbhash: widget.asset.thumbhash ?? '',
+              assetType: _toAssetType(widget.asset.type),
+              isAnimated: widget.asset.livePhotoVideoId != null,
+            ),
+            fit: BoxFit.contain,
+          ),
+        ),
+
+        // Directional colour overlay.
+        if (_overlayColor != null)
           Positioned.fill(
-            child: ImmichThumbnail(
-              asset: Asset.remote(asset),
-              width: size.width,
-              height: size.height,
-              fit: BoxFit.contain,
+            child: IgnorePointer(
+              child: Container(
+                color: _overlayColor!.withValues(alpha: _overlayOpacity),
+              ),
             ),
           ),
 
-          // ── Remaining count chip ────────────────────────────────────
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 12,
-            right: 16,
-            child: _CountChip(remaining: remaining),
+        // Swipe action icon + label (fades in during drag).
+        if (_drag.distance > 15)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: (_drag.distance / 100).clamp(0.0, 1.0),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_directionIcon, color: Colors.white, size: 80),
+                      const SizedBox(height: 8),
+                      Text(
+                        _directionLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(blurRadius: 4)],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
 
-          // ── Swipe-direction hints (gesture handling comes in S1.3) ──
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.paddingOf(context).bottom + 24,
-            child: _SwipeHints(theme: theme),
-          ),
+        // Cloud/local badge — top left.
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 12,
+          left: 16,
+          child: StorageBadge(asset: widget.asset),
+        ),
+
+        // Remaining-count chip — top right.
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 12,
+          right: 16,
+          child: _CountChip(remaining: widget.remaining),
+        ),
+      ],
+    );
+
+    // Wrap main card with the appropriate transform.
+    if (_isAnimating && _bounceController.isAnimating) {
+      mainCard = AnimatedBuilder(
+        animation: _bounceController,
+        builder: (_, child) {
+          final o = _bounceAnimation.value;
+          return Transform.translate(
+            offset: o,
+            child: Transform.rotate(angle: o.dx / 700, child: child),
+          );
+        },
+        child: mainCard,
+      );
+    } else if (_isAnimating && _flyController.isAnimating) {
+      mainCard = AnimatedBuilder(
+        animation: _flyController,
+        builder: (_, child) {
+          final o = _flyAnimation.value;
+          return Transform.translate(
+            offset: o,
+            child: Transform.rotate(angle: o.dx / 700, child: child),
+          );
+        },
+        child: mainCard,
+      );
+    } else if (!_isAnimating) {
+      mainCard = Transform.translate(
+        offset: _drag,
+        child: Transform.rotate(angle: _rotation, child: mainCard),
+      );
+    }
+
+    return GestureDetector(
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      child: Stack(
+        children: [
+          // Peek card behind the main card — only shown while dragging.
+          if (widget.nextAsset != null && (_drag != Offset.zero || _isAnimating))
+            Positioned.fill(
+              child: _buildPeekCard(widget.nextAsset!, size),
+            ),
+          // Main (draggable) card on top.
+          Positioned.fill(child: mainCard),
         ],
       ),
     );
   }
 }
+
+// ─── Remaining count chip ─────────────────────────────────────────────────────
 
 class _CountChip extends StatelessWidget {
   const _CountChip({required this.remaining});
@@ -220,77 +612,6 @@ class _CountChip extends StatelessWidget {
         '$remaining left',
         style: const TextStyle(color: Colors.white, fontSize: 13),
       ),
-    );
-  }
-}
-
-class _SwipeHints extends StatelessWidget {
-  const _SwipeHints({required this.theme});
-
-  final ThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _HintButton(
-          icon: Icons.chevron_left,
-          label: 'Skip',
-          color: Colors.grey.shade300,
-        ),
-        _HintButton(
-          icon: Icons.arrow_downward,
-          label: 'Review\nlater',
-          color: Colors.amber.shade300,
-        ),
-        _HintButton(
-          icon: Icons.chevron_right,
-          label: 'Sorted',
-          color: Colors.green.shade300,
-        ),
-      ],
-    );
-  }
-}
-
-class _HintButton extends StatelessWidget {
-  const _HintButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.black45,
-            border: Border.all(color: color, width: 2),
-          ),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-            height: 1.2,
-          ),
-        ),
-      ],
     );
   }
 }
