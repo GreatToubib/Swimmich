@@ -12,11 +12,13 @@ class UndoRecord {
     required this.asset,
     required this.action,
     required this.quickPickIds,
+    this.starRating = 0,
   });
 
   final AssetResponseDto asset;
   final SortAction action;
   final List<String> quickPickIds;
+  final int starRating; // 0 = none, 1–3 = stars selected at sort time
 }
 
 /// Executes the three sort-deck actions against the Immich API.
@@ -34,6 +36,7 @@ class SortActionService {
     String assetId,
     SortAction action, {
     List<String> quickPickAlbumIds = const [],
+    int starRating = 0,
   }) async {
     final newId =
         await _storage.read(SwimmichSystemAlbum.newAssets.storageKey);
@@ -56,6 +59,25 @@ class SortActionService {
         if (id != null) await _albumRepo.addAssets(id, [assetId]);
         for (final qId in quickPickAlbumIds) {
           await _albumRepo.addAssets(qId, [assetId]);
+        }
+        // Star albums — cumulative: 2★ adds to both _1 Star and _2 Star.
+        if (starRating >= 1) {
+          final oneId =
+              await _storage.read(SwimmichSystemAlbum.oneStar.storageKey);
+          if (oneId != null) await _albumRepo.addAssets(oneId, [assetId]);
+        }
+        if (starRating >= 2) {
+          final twoId =
+              await _storage.read(SwimmichSystemAlbum.twoStar.storageKey);
+          if (twoId != null) await _albumRepo.addAssets(twoId, [assetId]);
+        }
+        if (starRating >= 3) {
+          final threeId =
+              await _storage.read(SwimmichSystemAlbum.threeStar.storageKey);
+          if (threeId != null) await _albumRepo.addAssets(threeId, [assetId]);
+        }
+        if (starRating > 0) {
+          await _assetRepo.updateFavorite([assetId], true);
         }
         if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
     }
@@ -82,6 +104,31 @@ class SortActionService {
         if (id != null) await _albumRepo.removeAssets(id, [record.asset.id]);
         for (final qId in record.quickPickIds) {
           await _albumRepo.removeAssets(qId, [record.asset.id]);
+        }
+        // Reverse star albums.
+        if (record.starRating >= 1) {
+          final oneId =
+              await _storage.read(SwimmichSystemAlbum.oneStar.storageKey);
+          if (oneId != null) {
+            await _albumRepo.removeAssets(oneId, [record.asset.id]);
+          }
+        }
+        if (record.starRating >= 2) {
+          final twoId =
+              await _storage.read(SwimmichSystemAlbum.twoStar.storageKey);
+          if (twoId != null) {
+            await _albumRepo.removeAssets(twoId, [record.asset.id]);
+          }
+        }
+        if (record.starRating >= 3) {
+          final threeId =
+              await _storage.read(SwimmichSystemAlbum.threeStar.storageKey);
+          if (threeId != null) {
+            await _albumRepo.removeAssets(threeId, [record.asset.id]);
+          }
+        }
+        if (record.starRating > 0) {
+          await _assetRepo.updateFavorite([record.asset.id], false);
         }
         if (newId != null) await _albumRepo.addAssets(newId, [record.asset.id]);
     }

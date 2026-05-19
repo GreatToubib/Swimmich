@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
+import 'package:immich_mobile/presentation/sort/star_rating_bar.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/presentation/sort/storage_badge.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
@@ -215,6 +216,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// True while a fly-off or bounce-back animation is playing.
   bool _isAnimating = false;
 
+  /// Star rating selected by the user for the current card (0 = none, 1–3).
+  int _starRating = 0;
+
   /// Prevents the haptic from firing on every frame at threshold.
   bool _hapticFired = false;
 
@@ -315,12 +319,13 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       return;
     }
     if (action == SortAction.sorted &&
-        ref.read(quickPickProvider).selected.isEmpty) {
+        ref.read(quickPickProvider).selected.isEmpty &&
+        _starRating == 0) {
       _bounceBack();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Select an album chip below first'),
+            content: Text('Select an album or star rating first'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -377,14 +382,20 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       _drag = Offset.zero;
       _isAnimating = false;
       _hapticFired = false;
+      _starRating = 0;
     });
     _flyController.reset();
 
     // 3. Push undo record; show SnackBar only for delete.
     final assetId = widget.asset.id;
     final qpIds = ref.read(quickPickProvider).selected.toList();
-    final record =
-        UndoRecord(asset: widget.asset, action: action, quickPickIds: qpIds);
+    final starRating = _starRating;
+    final record = UndoRecord(
+      asset: widget.asset,
+      action: action,
+      quickPickIds: qpIds,
+      starRating: starRating,
+    );
     ref.read(undoStackProvider.notifier).push(record);
 
     if (action == SortAction.delete && mounted) {
@@ -408,8 +419,8 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       await ref.read(sortActionServiceProvider).execute(
             assetId,
             action,
-            quickPickAlbumIds:
-                action == SortAction.sorted ? qpIds : const [],
+            quickPickAlbumIds: action == SortAction.sorted ? qpIds : const [],
+            starRating: action == SortAction.sorted ? starRating : 0,
           );
       if (action == SortAction.sorted && mounted) {
         ref.read(quickPickProvider.notifier).recordUsage(qpIds);
@@ -539,6 +550,18 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           top: MediaQuery.paddingOf(context).top + 12,
           right: 16,
           child: _CountChip(remaining: widget.remaining),
+        ),
+
+        // Star rating bar — bottom right.
+        // EDIT MODE: in a future edit-mode flow, pre-populate _starRating from
+        // the asset's existing star album membership before displaying this card.
+        Positioned(
+          right: 12,
+          bottom: 12,
+          child: StarRatingBar(
+            rating: _starRating,
+            onChanged: (v) => setState(() => _starRating = v),
+          ),
         ),
       ],
     );
