@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/constants/constants.dart';
 import 'package:immich_mobile/extensions/build_context_extensions.dart';
 import 'package:immich_mobile/providers/album/album.provider.dart';
 import 'package:immich_mobile/providers/asset.provider.dart';
@@ -45,13 +46,21 @@ class TabControllerPage extends HookConsumerWidget {
     }
 
     void onNavigationSelected(TabsRouter router, int index) {
+      // Sort tab — no special action needed
+      if (index == kSortTabIndex) {
+        ref.read(hapticFeedbackProvider.notifier).selectionClick();
+        router.setActiveIndex(index);
+        ref.read(tabProvider.notifier).state = TabEnum.values[index];
+        return;
+      }
+
       // On Photos page menu tapped
-      if (router.activeIndex == 0 && index == 0) {
+      if (router.activeIndex == kPhotoTabIndex && index == kPhotoTabIndex) {
         scrollToTopNotifierProvider.scrollToTop();
       }
 
       // On Search page tapped
-      if (router.activeIndex == 1 && index == 1) {
+      if (router.activeIndex == kSearchTabIndex && index == kSearchTabIndex) {
         ref.read(searchInputFocusProvider).requestFocus();
       }
 
@@ -61,6 +70,11 @@ class TabControllerPage extends HookConsumerWidget {
     }
 
     final navigationDestinations = [
+      const NavigationDestination(
+        label: 'Sort',
+        icon: Icon(Icons.style_outlined),
+        selectedIcon: Icon(Icons.style),
+      ),
       NavigationDestination(
         label: 'photos'.tr(),
         icon: const Icon(Icons.photo_library_outlined),
@@ -114,7 +128,7 @@ class TabControllerPage extends HookConsumerWidget {
 
     final multiselectEnabled = ref.watch(multiselectProvider);
     return AutoTabsRouter(
-      routes: [const PhotosRoute(), SearchRoute(), const AlbumsRoute(), const LibraryRoute()],
+      routes: [const SortRoute(), const PhotosRoute(), SearchRoute(), const AlbumsRoute(), const LibraryRoute()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (context, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {

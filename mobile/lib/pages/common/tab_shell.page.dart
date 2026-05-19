@@ -34,6 +34,11 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
 
     final navigationDestinations = [
       NavigationDestination(
+        label: 'Sort',
+        icon: const Icon(Icons.style_outlined),
+        selectedIcon: Icon(Icons.style, color: context.primaryColor),
+      ),
+      NavigationDestination(
         label: 'photos'.tr(),
         icon: const Icon(Icons.photo_library_outlined),
         selectedIcon: Icon(Icons.photo_library, color: context.primaryColor),
@@ -78,7 +83,7 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
     }
 
     return AutoTabsRouter(
-      routes: const [MainTimelineRoute(), DriftSearchRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
+      routes: const [SortRoute(), MainTimelineRoute(), DriftSearchRoute(), DriftAlbumsRoute(), DriftLibraryRoute()],
       duration: const Duration(milliseconds: 600),
       transitionBuilder: (context, child, animation) => FadeTransition(opacity: animation, child: child),
       builder: (context, child) {
@@ -106,6 +111,14 @@ class _TabShellPageState extends ConsumerState<TabShellPage> {
 }
 
 void _onNavigationSelected(TabsRouter router, int index, WidgetRef ref) {
+  // Sort tab — no special action needed
+  if (index == kSortTabIndex) {
+    ref.read(hapticFeedbackProvider.notifier).selectionClick();
+    router.setActiveIndex(index);
+    ref.read(tabProvider.notifier).state = TabEnum.values[index];
+    return;
+  }
+
   // On Photos page menu tapped
   if (router.activeIndex == kPhotoTabIndex && index == kPhotoTabIndex) {
     EventStream.shared.emit(const ScrollToTopEvent());
