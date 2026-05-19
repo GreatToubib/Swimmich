@@ -27,6 +27,12 @@ class SortQueueState {
   /// How many cards remain from the current position to the end of the loaded list.
   int get remaining => assets.length - currentIndex;
 
+  /// The asset directly behind the current card (for the peek effect), or null.
+  AssetResponseDto? get nextAsset {
+    final next = currentIndex + 1;
+    return next < assets.length ? assets[next] : null;
+  }
+
   SortQueueState copyWith({
     List<AssetResponseDto>? assets,
     int? currentIndex,
@@ -104,6 +110,16 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     }
 
     state = AsyncData(s.copyWith(currentIndex: next));
+  }
+
+  /// Inserts an asset at the current position (front of the visible deck).
+  /// Used by undo to make the un-done card immediately visible.
+  void insertAtCurrent(AssetResponseDto asset) {
+    final s = state.valueOrNull;
+    if (s == null) return;
+    final next = List<AssetResponseDto>.from(s.assets)
+      ..insert(s.currentIndex, asset);
+    state = AsyncData(s.copyWith(assets: next));
   }
 
   /// Rolls back a single [advance] call for optimistic-failure recovery.

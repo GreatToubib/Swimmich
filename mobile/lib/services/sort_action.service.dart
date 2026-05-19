@@ -3,8 +3,21 @@ import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
+import 'package:openapi/api.dart';
 
 enum SortAction { delete, reviewLater, sorted }
+
+class UndoRecord {
+  const UndoRecord({
+    required this.asset,
+    required this.action,
+    required this.quickPickIds,
+  });
+
+  final AssetResponseDto asset;
+  final SortAction action;
+  final List<String> quickPickIds;
+}
 
 /// Executes the three sort-deck actions against the Immich API.
 ///
@@ -45,6 +58,32 @@ class SortActionService {
           await _albumRepo.addAssets(qId, [assetId]);
         }
         if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
+    }
+  }
+
+  Future<void> undo(UndoRecord record) async {
+    final newId = await _storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+
+    switch (record.action) {
+      case SortAction.delete:
+        await _assetRepo.restoreTrash([record.asset.id]);
+        if (newId != null) {
+          await _albumRepo.addAssets(newId, [record.asset.id]);
+        }
+
+      case SortAction.reviewLater:
+        final id =
+            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        if (id != null) await _albumRepo.removeAssets(id, [record.asset.id]);
+        if (newId != null) await _albumRepo.addAssets(newId, [record.asset.id]);
+
+      case SortAction.sorted:
+        final id = await _storage.read(SwimmichSystemAlbum.sorted.storageKey);
+        if (id != null) await _albumRepo.removeAssets(id, [record.asset.id]);
+        for (final qId in record.quickPickIds) {
+          await _albumRepo.removeAssets(qId, [record.asset.id]);
+        }
+        if (newId != null) await _albumRepo.addAssets(newId, [record.asset.id]);
     }
   }
 }

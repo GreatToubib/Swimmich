@@ -150,6 +150,40 @@ class SwimmichBootstrapService {
     return result;
   }
 
+  static const _kLastSeenAtKey = 'swimmich.last_seen_at';
+
+  /// Incremental check: finds assets created after the last known timestamp and
+  /// adds them to the _New album so they appear in the sort deck.
+  Future<void> checkForNewAssets() async {
+    final newId = await _storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+    if (newId == null) return; // bootstrap not yet run
+
+    final lastSeenRaw = await _storage.read(_kLastSeenAtKey);
+    final lastSeen =
+        lastSeenRaw != null ? DateTime.tryParse(lastSeenRaw) : null;
+
+    int page = 1;
+    const pageSize = 100;
+    while (true) {
+      final resp = await _searchApi.searchAssets(
+        MetadataSearchDto(
+          createdAfter: lastSeen,
+          withDeleted: false,
+          page: page,
+          size: pageSize,
+        ),
+      );
+      if (resp == null) break;
+      final ids = resp.assets.items.map((a) => a.id).toList();
+      if (ids.isNotEmpty) await _albumApi.addAssets(newId, ids);
+      if (resp.assets.nextPage == null) break;
+      page++;
+    }
+
+    await _storage.write(
+        _kLastSeenAtKey, DateTime.now().toUtc().toIso8601String());
+  }
+
   Future<bool> isBackfillComplete() async =>
       (await _storage.read(_backfillCompleteKey)) == '1';
 

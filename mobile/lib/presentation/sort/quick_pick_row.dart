@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/pages/sort/album_picker_sheet.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 
@@ -27,9 +28,14 @@ class QuickPickRow extends ConsumerWidget {
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          itemCount: chips.length,
+          itemCount: chips.length + 1,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (context, i) {
+            if (i == chips.length) {
+              return _MoreChip(
+                onTap: () => showAlbumPickerSheet(context, ref),
+              );
+            }
             final chip = chips[i];
             final isPinnedSlot = i < 3;
             if (chip == null) {
@@ -91,6 +97,42 @@ class QuickPickRow extends ConsumerWidget {
     if (selected != null) {
       await ref.read(quickPickProvider.notifier).setPinned(slot, selected);
     }
+  }
+}
+
+// ─── More chip ───────────────────────────────────────────────────────────────
+
+class _MoreChip extends StatelessWidget {
+  const _MoreChip({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add, size: 14, color: theme.colorScheme.outline),
+            const SizedBox(width: 4),
+            Text(
+              'More',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -24,6 +24,7 @@ import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/services/background.service.dart';
+import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:isar/isar.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -96,6 +97,11 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
       }
 
       await _ref.read(serverInfoProvider.notifier).getServerVersion();
+
+      // S1.8: Check for newly backed-up photos (fire-and-forget).
+      unawaited(
+        _ref.read(swimmichBootstrapServiceProvider).checkForNewAssets(),
+      );
     }
 
     if (!Store.isBetaTimelineEnabled) {

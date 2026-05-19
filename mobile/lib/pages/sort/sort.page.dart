@@ -1,12 +1,16 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
+import 'package:immich_mobile/presentation/sort/storage_badge.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
+import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/widgets/common/immich_thumbnail.dart';
 import 'package:openapi/api.dart';
@@ -34,33 +38,24 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    return RefreshIndicator(
-      onRefresh: notifier.refresh,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            child: queueAsync.when(
-              loading: () => const _LoadingView(),
-              error: (e, _) =>
-                  _ErrorView(error: e.toString(), onRetry: notifier.refresh),
-              data: (queue) => queue.current == null
-                  ? _AllCaughtUpView(onRefresh: notifier.refresh)
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: _SortDeckView(
-                            asset: queue.current!,
-                            remaining: queue.remaining,
-                          ),
-                        ),
-                        const QuickPickRow(),
-                      ],
-                    ),
+    return queueAsync.when(
+      loading: () => const _LoadingView(),
+      error: (e, _) =>
+          _ErrorView(error: e.toString(), onRetry: notifier.refresh),
+      data: (queue) => queue.current == null
+          ? _AllCaughtUpView(onRefresh: notifier.refresh)
+          : Column(
+              children: [
+                Expanded(
+                  child: _SortDeckView(
+                    asset: queue.current!,
+                    remaining: queue.remaining,
+                    nextAsset: queue.nextAsset,
+                  ),
+                ),
+                const QuickPickRow(),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -173,10 +168,15 @@ class _AllCaughtUpView extends StatelessWidget {
 // ─── Swipe-deck card ──────────────────────────────────────────────────────────
 
 class _SortDeckView extends ConsumerStatefulWidget {
-  const _SortDeckView({required this.asset, required this.remaining});
+  const _SortDeckView({
+    required this.asset,
+    required this.remaining,
+    this.nextAsset,
+  });
 
   final AssetResponseDto asset;
   final int remaining;
+  final AssetResponseDto? nextAsset;
 
   @override
   ConsumerState<_SortDeckView> createState() => _SortDeckViewState();
@@ -337,9 +337,28 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     });
     _flyController.reset();
 
-    // 3. Execute the API call (background; roll back on failure).
+    // 3. Push undo record and show SnackBar.
     final assetId = widget.asset.id;
     final qpIds = ref.read(quickPickProvider).selected.toList();
+    final record =
+        UndoRecord(asset: widget.asset, action: action, quickPickIds: qpIds);
+    ref.read(undoStackProvider.notifier).push(record);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_undoLabel(action)),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => _executeUndo(record),
+          ),
+        ),
+      );
+    }
+
+    // 4. Execute the API call (background; roll back on failure).
     try {
       await ref.read(sortActionServiceProvider).execute(
             assetId,
@@ -361,6 +380,49 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     }
   }
 
+  String _undoLabel(SortAction action) => switch (action) {
+        SortAction.delete => 'Photo deleted',
+        SortAction.reviewLater => 'Saved for later',
+        SortAction.sorted => 'Photo sorted',
+      };
+
+  Future<void> _executeUndo(UndoRecord record) async {
+    ref.read(undoStackProvider.notifier).pop();
+    ref.read(sortQueueProvider.notifier).insertAtCurrent(record.asset);
+    try {
+      await ref.read(sortActionServiceProvider).undo(record);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Undo failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ── Peek card ──────────────────────────────────────────────────────────────
+
+  Widget _buildPeekCard(AssetResponseDto asset, Size size) {
+    final progress = (_drag.distance / 120).clamp(0.0, 1.0);
+    final scale = lerpDouble(0.94, 1.0, progress)!;
+    final yOffset = lerpDouble(14.0, 0.0, progress)!;
+    return Transform.translate(
+      offset: Offset(0, yOffset),
+      child: Transform.scale(
+        scale: scale,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ImmichThumbnail(
+            asset: Asset.remote(asset),
+            width: size.width,
+            height: size.height,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -368,7 +430,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     final size = MediaQuery.sizeOf(context);
     final activeAction = _activeAction;
 
-    Widget card = Stack(
+    Widget mainCard = Stack(
       children: [
         // Photo.
         Positioned.fill(
@@ -390,7 +452,14 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             ),
           ),
 
-        // Remaining-count chip.
+        // Cloud/local badge — top left.
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 12,
+          left: 16,
+          child: StorageBadge(asset: widget.asset),
+        ),
+
+        // Remaining-count chip — top right.
         Positioned(
           top: MediaQuery.paddingOf(context).top + 12,
           right: 16,
@@ -407,9 +476,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       ],
     );
 
-    // Wrap with the appropriate transform.
+    // Wrap main card with the appropriate transform.
     if (_isAnimating && _bounceController.isAnimating) {
-      card = AnimatedBuilder(
+      mainCard = AnimatedBuilder(
         animation: _bounceController,
         builder: (_, child) {
           final o = _bounceAnimation.value;
@@ -418,10 +487,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             child: Transform.rotate(angle: o.dx / 700, child: child),
           );
         },
-        child: card,
+        child: mainCard,
       );
     } else if (_isAnimating && _flyController.isAnimating) {
-      card = AnimatedBuilder(
+      mainCard = AnimatedBuilder(
         animation: _flyController,
         builder: (_, child) {
           final o = _flyAnimation.value;
@@ -430,12 +499,12 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             child: Transform.rotate(angle: o.dx / 700, child: child),
           );
         },
-        child: card,
+        child: mainCard,
       );
     } else if (!_isAnimating) {
-      card = Transform.translate(
+      mainCard = Transform.translate(
         offset: _drag,
-        child: Transform.rotate(angle: _rotation, child: card),
+        child: Transform.rotate(angle: _rotation, child: mainCard),
       );
     }
 
@@ -444,7 +513,17 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       body: GestureDetector(
         onPanUpdate: _onPanUpdate,
         onPanEnd: _onPanEnd,
-        child: card,
+        child: Stack(
+          children: [
+            // Peek card behind the main card.
+            if (widget.nextAsset != null)
+              Positioned.fill(
+                child: _buildPeekCard(widget.nextAsset!, size),
+              ),
+            // Main (draggable) card on top.
+            Positioned.fill(child: mainCard),
+          ],
+        ),
       ),
     );
   }
@@ -552,8 +631,7 @@ class _HintButton extends StatelessWidget {
             style: TextStyle(
               color: isActive ? Colors.white : Colors.white70,
               fontSize: 11,
-              fontWeight:
-                  isActive ? FontWeight.w600 : FontWeight.normal,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               height: 1.2,
             ),
           ),
