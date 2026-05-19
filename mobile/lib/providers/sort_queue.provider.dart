@@ -106,6 +106,13 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     state = AsyncData(s.copyWith(currentIndex: next));
   }
 
+  /// Rolls back a single [advance] call for optimistic-failure recovery.
+  void revertAdvance() {
+    final s = state.valueOrNull;
+    if (s == null || s.currentIndex == 0) return;
+    state = AsyncData(s.copyWith(currentIndex: s.currentIndex - 1));
+  }
+
   /// Reset the queue and reload from page 1.
   Future<void> refresh() async {
     _page = 1;

@@ -3,7 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
+import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
+import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
+import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/widgets/common/immich_thumbnail.dart';
 import 'package:openapi/api.dart';
 
@@ -33,18 +37,25 @@ class SortPage extends HookConsumerWidget {
     return RefreshIndicator(
       onRefresh: notifier.refresh,
       child: CustomScrollView(
-        // CustomScrollView satisfies RefreshIndicator's Scrollable requirement.
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverFillRemaining(
             child: queueAsync.when(
               loading: () => const _LoadingView(),
-              error: (e, _) => _ErrorView(error: e.toString(), onRetry: notifier.refresh),
+              error: (e, _) =>
+                  _ErrorView(error: e.toString(), onRetry: notifier.refresh),
               data: (queue) => queue.current == null
                   ? _AllCaughtUpView(onRefresh: notifier.refresh)
-                  : _SortCardView(
-                      asset: queue.current!,
-                      remaining: queue.remaining,
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: _SortDeckView(
+                            asset: queue.current!,
+                            remaining: queue.remaining,
+                          ),
+                        ),
+                        const QuickPickRow(),
+                      ],
                     ),
             ),
           ),
@@ -54,7 +65,7 @@ class SortPage extends HookConsumerWidget {
   }
 }
 
-// ─── Loading ────────────────────────────────────────────────────────────────
+// ─── Loading ─────────────────────────────────────────────────────────────────
 
 class _LoadingView extends StatelessWidget {
   const _LoadingView();
@@ -67,7 +78,7 @@ class _LoadingView extends StatelessWidget {
   }
 }
 
-// ─── Error ──────────────────────────────────────────────────────────────────
+// ─── Error ───────────────────────────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.error, required this.onRetry});
@@ -110,7 +121,7 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-// ─── Empty state ────────────────────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 class _AllCaughtUpView extends StatelessWidget {
   const _AllCaughtUpView({required this.onRefresh});
@@ -138,7 +149,10 @@ class _AllCaughtUpView extends StatelessWidget {
               Text(
                 'No new photos to sort right now.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -156,52 +170,287 @@ class _AllCaughtUpView extends StatelessWidget {
   }
 }
 
-// ─── Card ────────────────────────────────────────────────────────────────────
+// ─── Swipe-deck card ──────────────────────────────────────────────────────────
 
-class _SortCardView extends StatelessWidget {
-  const _SortCardView({required this.asset, required this.remaining});
+class _SortDeckView extends ConsumerStatefulWidget {
+  const _SortDeckView({required this.asset, required this.remaining});
 
   final AssetResponseDto asset;
   final int remaining;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final size = MediaQuery.sizeOf(context);
+  ConsumerState<_SortDeckView> createState() => _SortDeckViewState();
+}
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // ── Photo ──────────────────────────────────────────────────────
+class _SortDeckViewState extends ConsumerState<_SortDeckView>
+    with TickerProviderStateMixin {
+  /// Current drag offset while the user is touching the screen.
+  Offset _drag = Offset.zero;
+
+  /// True while a fly-off or bounce-back animation is playing.
+  bool _isAnimating = false;
+
+  /// Prevents the haptic from firing on every frame at threshold.
+  bool _hapticFired = false;
+
+  /// Drives the card off-screen after a committed swipe.
+  late final AnimationController _flyController;
+  late Animation<Offset> _flyAnimation;
+
+  /// Snaps the card back to centre after a rejected drag.
+  late final AnimationController _bounceController;
+  late Animation<Offset> _bounceAnimation;
+
+  static const double _hThreshold = 90.0;
+  static const double _vThreshold = 70.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _flyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+  }
+
+  @override
+  void dispose() {
+    _flyController.dispose();
+    _bounceController.dispose();
+    super.dispose();
+  }
+
+  // ── Direction helpers ──────────────────────────────────────────────────────
+
+  SortAction? get _activeAction {
+    if (_drag.dy > _vThreshold && _drag.dy > _drag.dx.abs()) {
+      return SortAction.reviewLater;
+    }
+    if (_drag.dx > _hThreshold) return SortAction.sorted;
+    if (_drag.dx < -_hThreshold) return SortAction.delete;
+    return null;
+  }
+
+  Color? get _overlayColor {
+    final action = _activeAction;
+    if (action != null) {
+      return switch (action) {
+        SortAction.delete => Colors.red,
+        SortAction.sorted => Colors.green,
+        SortAction.reviewLater => Colors.amber,
+      };
+    }
+    if (_drag.dx < -20) return Colors.red;
+    if (_drag.dx > 20) return Colors.green;
+    if (_drag.dy > 20) return Colors.amber;
+    return null;
+  }
+
+  double get _overlayOpacity => (_drag.distance / 140).clamp(0.0, 0.55);
+  double get _rotation => _drag.dx / 700;
+
+  // ── Gesture callbacks ──────────────────────────────────────────────────────
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_isAnimating) return;
+    setState(() => _drag += d.delta);
+    if (!_hapticFired && _activeAction != null) {
+      ref.read(hapticFeedbackProvider.notifier).mediumImpact();
+      _hapticFired = true;
+    }
+    if (_activeAction == null) _hapticFired = false;
+  }
+
+  void _onPanEnd(DragEndDetails _) {
+    final action = _activeAction;
+    if (action == null) {
+      _bounceBack();
+      return;
+    }
+    if (action == SortAction.sorted &&
+        ref.read(quickPickProvider).selected.isEmpty) {
+      _bounceBack();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Select an album chip below first'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+    _commitAction(action);
+  }
+
+  // ── Animations ─────────────────────────────────────────────────────────────
+
+  void _bounceBack() {
+    _bounceAnimation = Tween<Offset>(begin: _drag, end: Offset.zero).animate(
+      CurvedAnimation(parent: _bounceController, curve: Curves.elasticOut),
+    );
+    _isAnimating = true;
+    _bounceController
+      ..reset()
+      ..forward().then((_) {
+        if (mounted) {
+          setState(() {
+            _drag = Offset.zero;
+            _isAnimating = false;
+            _hapticFired = false;
+          });
+        }
+      });
+  }
+
+  Future<void> _commitAction(SortAction action) async {
+    final screenSize = MediaQuery.sizeOf(context);
+    final target = switch (action) {
+      SortAction.delete => Offset(-screenSize.width * 1.5, _drag.dy),
+      SortAction.sorted => Offset(screenSize.width * 1.5, _drag.dy),
+      SortAction.reviewLater => Offset(_drag.dx, screenSize.height * 1.5),
+    };
+
+    _flyAnimation = Tween<Offset>(begin: _drag, end: target).animate(
+      CurvedAnimation(parent: _flyController, curve: Curves.easeIn),
+    );
+    _isAnimating = true;
+    _flyController.reset();
+
+    // 1. Play fly-off animation.
+    await _flyController.forward();
+    if (!mounted) return;
+
+    // 2. Optimistically advance to the next card.
+    await ref.read(sortQueueProvider.notifier).advance();
+    if (!mounted) return;
+
+    // Reset visual state for the next card before the API call.
+    setState(() {
+      _drag = Offset.zero;
+      _isAnimating = false;
+      _hapticFired = false;
+    });
+    _flyController.reset();
+
+    // 3. Execute the API call (background; roll back on failure).
+    final assetId = widget.asset.id;
+    final qpIds = ref.read(quickPickProvider).selected.toList();
+    try {
+      await ref.read(sortActionServiceProvider).execute(
+            assetId,
+            action,
+            quickPickAlbumIds:
+                action == SortAction.sorted ? qpIds : const [],
+          );
+      if (action == SortAction.sorted && mounted) {
+        ref.read(quickPickProvider.notifier).recordUsage(qpIds);
+        ref.read(quickPickProvider.notifier).clearSelection();
+      }
+    } catch (e) {
+      ref.read(sortQueueProvider.notifier).revertAdvance();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Action failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final activeAction = _activeAction;
+
+    Widget card = Stack(
+      children: [
+        // Photo.
+        Positioned.fill(
+          child: ImmichThumbnail(
+            asset: Asset.remote(widget.asset),
+            width: size.width,
+            height: size.height,
+            fit: BoxFit.contain,
+          ),
+        ),
+
+        // Directional colour overlay.
+        if (_overlayColor != null)
           Positioned.fill(
-            child: ImmichThumbnail(
-              asset: Asset.remote(asset),
-              width: size.width,
-              height: size.height,
-              fit: BoxFit.contain,
+            child: IgnorePointer(
+              child: Container(
+                color: _overlayColor!.withValues(alpha: _overlayOpacity),
+              ),
             ),
           ),
 
-          // ── Remaining count chip ────────────────────────────────────
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 12,
-            right: 16,
-            child: _CountChip(remaining: remaining),
-          ),
+        // Remaining-count chip.
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 12,
+          right: 16,
+          child: _CountChip(remaining: widget.remaining),
+        ),
 
-          // ── Swipe-direction hints (gesture handling comes in S1.3) ──
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.paddingOf(context).bottom + 24,
-            child: _SwipeHints(theme: theme),
-          ),
-        ],
+        // Swipe-hint buttons.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: MediaQuery.paddingOf(context).bottom + 24,
+          child: _SwipeHintBar(activeAction: activeAction),
+        ),
+      ],
+    );
+
+    // Wrap with the appropriate transform.
+    if (_isAnimating && _bounceController.isAnimating) {
+      card = AnimatedBuilder(
+        animation: _bounceController,
+        builder: (_, child) {
+          final o = _bounceAnimation.value;
+          return Transform.translate(
+            offset: o,
+            child: Transform.rotate(angle: o.dx / 700, child: child),
+          );
+        },
+        child: card,
+      );
+    } else if (_isAnimating && _flyController.isAnimating) {
+      card = AnimatedBuilder(
+        animation: _flyController,
+        builder: (_, child) {
+          final o = _flyAnimation.value;
+          return Transform.translate(
+            offset: o,
+            child: Transform.rotate(angle: o.dx / 700, child: child),
+          );
+        },
+        child: card,
+      );
+    } else if (!_isAnimating) {
+      card = Transform.translate(
+        offset: _drag,
+        child: Transform.rotate(angle: _rotation, child: card),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: _onPanEnd,
+        child: card,
       ),
     );
   }
 }
+
+// ─── Remaining count chip ─────────────────────────────────────────────────────
 
 class _CountChip extends StatelessWidget {
   const _CountChip({required this.remaining});
@@ -224,10 +473,12 @@ class _CountChip extends StatelessWidget {
   }
 }
 
-class _SwipeHints extends StatelessWidget {
-  const _SwipeHints({required this.theme});
+// ─── Swipe-hint bar ───────────────────────────────────────────────────────────
 
-  final ThemeData theme;
+class _SwipeHintBar extends StatelessWidget {
+  const _SwipeHintBar({required this.activeAction});
+
+  final SortAction? activeAction;
 
   @override
   Widget build(BuildContext context) {
@@ -235,19 +486,22 @@ class _SwipeHints extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _HintButton(
-          icon: Icons.chevron_left,
-          label: 'Skip',
-          color: Colors.grey.shade300,
+          icon: Icons.delete_outline,
+          label: 'Delete',
+          color: Colors.red.shade300,
+          isActive: activeAction == SortAction.delete,
         ),
         _HintButton(
-          icon: Icons.arrow_downward,
-          label: 'Review\nlater',
+          icon: Icons.schedule_outlined,
+          label: 'Later',
           color: Colors.amber.shade300,
+          isActive: activeAction == SortAction.reviewLater,
         ),
         _HintButton(
-          icon: Icons.chevron_right,
+          icon: Icons.check_circle_outline,
           label: 'Sorted',
           color: Colors.green.shade300,
+          isActive: activeAction == SortAction.sorted,
         ),
       ],
     );
@@ -259,38 +513,52 @@ class _HintButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.color,
+    required this.isActive,
   });
 
   final IconData icon;
   final String label;
   final Color color;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.black45,
-            border: Border.all(color: color, width: 2),
+    return AnimatedScale(
+      scale: isActive ? 1.2 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive
+                  ? color.withValues(alpha: 0.25)
+                  : Colors.black45,
+              border: Border.all(
+                color: color,
+                width: isActive ? 2.5 : 1.5,
+              ),
+            ),
+            child: Icon(icon, color: color, size: 28),
           ),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 11,
-            height: 1.2,
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.white70,
+              fontSize: 11,
+              fontWeight:
+                  isActive ? FontWeight.w600 : FontWeight.normal,
+              height: 1.2,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
