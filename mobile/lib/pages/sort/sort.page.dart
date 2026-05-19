@@ -377,6 +377,11 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     await ref.read(sortQueueProvider.notifier).advance();
     if (!mounted) return;
 
+    // Capture before setState resets _starRating to 0.
+    final assetId = widget.asset.id;
+    final qpIds = ref.read(quickPickProvider).selected.toList();
+    final starRating = _starRating;
+
     // Reset visual state for the next card before the API call.
     setState(() {
       _drag = Offset.zero;
@@ -387,9 +392,6 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     _flyController.reset();
 
     // 3. Push undo record; show SnackBar only for delete.
-    final assetId = widget.asset.id;
-    final qpIds = ref.read(quickPickProvider).selected.toList();
-    final starRating = _starRating;
     final record = UndoRecord(
       asset: widget.asset,
       action: action,

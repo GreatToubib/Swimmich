@@ -8,16 +8,17 @@ import 'package:openapi/api.dart';
 
 /// The six "system" albums Swimmich manages on behalf of the user.
 ///
-/// Names are user-visible and intentionally prefixed with `_` so they sort to
-/// the top and look distinct from user-created albums. The storage key is the
+/// Non-star albums are prefixed with `_` to sort to the top. Star albums use
+/// emoji names (⭐/⭐⭐/⭐⭐⭐). All are identified robustly by their storage
+/// key — never rely on name alone. The storage key is the
 /// flutter_secure_storage slot where the album's remote id is cached.
 enum SwimmichSystemAlbum {
   newAssets._('_New', 'swimmich.album.new'),
   reviewLater._('_Review later', 'swimmich.album.review_later'),
   sorted._('_Sorted', 'swimmich.album.sorted'),
-  oneStar._('_1 Star', 'swimmich.album.one_star'),
-  twoStar._('_2 Star', 'swimmich.album.two_star'),
-  threeStar._('_3 Star', 'swimmich.album.three_star');
+  oneStar._('⭐', 'swimmich.album.one_star'),
+  twoStar._('⭐⭐', 'swimmich.album.two_star'),
+  threeStar._('⭐⭐⭐', 'swimmich.album.three_star');
 
   const SwimmichSystemAlbum._(this.albumName, this.storageKey);
   final String albumName;

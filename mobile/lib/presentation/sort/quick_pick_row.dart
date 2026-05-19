@@ -4,6 +4,7 @@ import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/pages/sort/album_picker_sheet.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 
 /// Two-row album chip section below the sort card.
 ///
@@ -104,11 +105,16 @@ class QuickPickRow extends ConsumerWidget {
     required QuickPickState qp,
   }) async {
     if (albums.isEmpty) return;
+    // Filter system albums by ID — robust against emoji names that don't start with '_'.
+    final systemIds = await ref.read(systemAlbumIdsProvider.future);
+    final filtered =
+        albums.where((a) => !systemIds.contains(a.id)).toList();
+
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _PinPickerSheet(
-        albums: albums,
+        albums: filtered,
         currentId: slot < 3 ? qp.pinned[slot] : null,
       ),
     );
