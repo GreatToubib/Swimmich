@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/album/album.model.dart';
+import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/repositories/album_api.repository.dart';
 
 /// Settings widget for configuring the 3 pinned quick-pick album slots.
 class SortSettings extends ConsumerWidget {
@@ -13,6 +14,10 @@ class SortSettings extends ConsumerWidget {
     final qp = ref.watch(quickPickProvider);
     final albumState = ref.watch(remoteAlbumProvider);
     final albums = albumState.albums;
+
+    // Trigger a load so chip names display correctly even if Albums tab
+    // was never visited. Safe to call on every build — the notifier debounces.
+    ref.read(remoteAlbumProvider.notifier).refresh();
 
     Widget pinnedTile(int slot) {
       final albumId = qp.pinned[slot];
@@ -40,7 +45,7 @@ class SortSettings extends ConsumerWidget {
             const Icon(Icons.chevron_right),
           ],
         ),
-        onTap: () => _showAlbumPicker(context, ref, slot, albums, qp),
+        onTap: () => _showAlbumPicker(context, ref, slot, qp),
       );
     }
 
@@ -68,21 +73,14 @@ class SortSettings extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     int slot,
-    List<RemoteAlbum> albums,
     QuickPickState qp,
   ) async {
-    if (albums.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No albums found. Refresh the Albums tab first.')),
-      );
-      return;
-    }
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _AlbumPickerSheet(
-        albums: albums,
-        currentId: qp.pinned[slot],
+      builder: (_) => UncontrolledProviderScope(
+        container: ProviderScope.containerOf(context),
+        child: _AlbumPickerSheet(currentId: qp.pinned[slot]),
       ),
     );
     if (selected != null) {
@@ -91,11 +89,48 @@ class SortSettings extends ConsumerWidget {
   }
 }
 
-class _AlbumPickerSheet extends StatelessWidget {
-  const _AlbumPickerSheet({required this.albums, required this.currentId});
+class _AlbumPickerSheet extends ConsumerStatefulWidget {
+  const _AlbumPickerSheet({required this.currentId});
 
-  final List<RemoteAlbum> albums;
   final String? currentId;
+
+  @override
+  ConsumerState<_AlbumPickerSheet> createState() => _AlbumPickerSheetState();
+}
+
+class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
+  List<Album>? _albums;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final all =
+          await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      if (mounted) {
+        setState(() {
+          _albums = all
+              .where((a) => !a.name.startsWith('_') && a.remoteId != null)
+              .toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,28 +157,53 @@ class _AlbumPickerSheet extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              controller: controller,
-              itemCount: albums.length,
-              itemBuilder: (_, i) {
-                final album = albums[i];
-                final isCurrent = album.id == currentId;
-                return ListTile(
-                  leading: Icon(
-                    Icons.photo_album_outlined,
-                    color: isCurrent
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                  title: Text(album.name),
-                  trailing: isCurrent
-                      ? Icon(Icons.check,
-                          color: Theme.of(context).colorScheme.primary)
-                      : null,
-                  onTap: () => Navigator.of(context).pop(album.id),
-                );
-              },
-            ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Failed to load albums',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _load,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: controller,
+                        itemCount: _albums!.length,
+                        itemBuilder: (_, i) {
+                          final album = _albums![i];
+                          // Use remoteId as the pinned slot value so
+                          // quickPickProvider can match against API album IDs.
+                          final id = album.remoteId!;
+                          final isCurrent = id == widget.currentId;
+                          return ListTile(
+                            leading: Icon(
+                              Icons.photo_album_outlined,
+                              color: isCurrent
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                            ),
+                            title: Text(album.name),
+                            trailing: isCurrent
+                                ? Icon(
+                                    Icons.check,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  )
+                                : null,
+                            onTap: () => Navigator.of(context).pop(id),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

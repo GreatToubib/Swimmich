@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
+import 'package:immich_mobile/services/sort_action.service.dart';
 
-/// Opens the full-search album picker and wires the selected album into
-/// [quickPickProvider.selected]. Call from the "More" chip in QuickPickRow.
+/// Opens the full-search album picker. The user can select multiple albums
+/// without the sheet closing, then tap "Sort" to sort the current card into
+/// all selected albums at once.
 Future<void> showAlbumPickerSheet(BuildContext context, WidgetRef ref) async {
   await showModalBottomSheet(
     context: context,
@@ -34,6 +37,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   bool _showCreateField = false;
   bool _isCreating = false;
   String? _createError;
+  bool _isSorting = false;
 
   List<Album>? _allAlbums;
   bool _loading = true;
@@ -118,7 +122,11 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
         ref.read(quickPickProvider.notifier).toggle(remoteId);
       }
       await _fetchAlbums();
-      if (mounted) Navigator.of(context).pop();
+      setState(() {
+        _isCreating = false;
+        _showCreateField = false;
+        _newNameController.clear();
+      });
     } catch (e) {
       setState(() {
         _isCreating = false;
@@ -127,9 +135,38 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     }
   }
 
+  Future<void> _executeSortAndClose() async {
+    final current = ref.read(sortQueueProvider).valueOrNull?.current;
+    if (current == null) return;
+
+    setState(() => _isSorting = true);
+    final assetId = current.id;
+    final qpIds = ref.read(quickPickProvider).selected.toList();
+
+    try {
+      await ref.read(sortQueueProvider.notifier).advance();
+      await ref.read(sortActionServiceProvider).execute(
+            assetId,
+            SortAction.sorted,
+            quickPickAlbumIds: qpIds,
+          );
+      ref.read(quickPickProvider.notifier).recordUsage(qpIds);
+      ref.read(quickPickProvider.notifier).clearSelection();
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      setState(() => _isSorting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sort failed: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final qp = ref.watch(quickPickProvider);
+    final selectedCount = qp.selected.length;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -149,7 +186,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              'Select album',
+              'Select album(s)',
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
@@ -240,19 +277,50 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
                             trailing: isSelected
                                 ? Icon(
                                     Icons.check,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .primary,
                                   )
                                 : null,
-                            onTap: () {
-                              ref
-                                  .read(quickPickProvider.notifier)
-                                  .toggle(albumId);
-                              Navigator.of(context).pop();
-                            },
+                            // Toggle selection — do NOT close the sheet.
+                            onTap: () => ref
+                                .read(quickPickProvider.notifier)
+                                .toggle(albumId),
                           );
                         },
                       ),
+          ),
+          // Sort button — executes SortAction.sorted for the current card.
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.paddingOf(context).bottom + 8,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: selectedCount == 0 || _isSorting
+                    ? null
+                    : _executeSortAndClose,
+                icon: _isSorting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check_circle_outline),
+                label: Text(
+                  selectedCount == 0
+                      ? 'Select an album first'
+                      : 'Sort into $selectedCount album${selectedCount == 1 ? '' : 's'}',
+                ),
+              ),
+            ),
           ),
         ],
       ),

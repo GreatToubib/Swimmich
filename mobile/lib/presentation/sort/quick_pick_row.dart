@@ -34,7 +34,6 @@ class QuickPickRow extends ConsumerWidget {
       }
       return _AlbumChip(
         albumName: nameFor(chip.albumId),
-        icon: Icons.push_pin,
         isSelected: qp.selected.contains(chip.albumId),
         onTap: () => ref.read(quickPickProvider.notifier).toggle(chip.albumId),
         onLongPress: () =>
@@ -47,7 +46,6 @@ class QuickPickRow extends ConsumerWidget {
       if (chip == null) return const SizedBox.shrink();
       return _AlbumChip(
         albumName: nameFor(chip.albumId),
-        icon: Icons.history,
         isSelected: qp.selected.contains(chip.albumId),
         onTap: () => ref.read(quickPickProvider.notifier).toggle(chip.albumId),
       );
@@ -233,14 +231,12 @@ class _EmptySlot extends StatelessWidget {
 class _AlbumChip extends StatelessWidget {
   const _AlbumChip({
     required this.albumName,
-    required this.icon,
     required this.isSelected,
     required this.onTap,
     this.onLongPress,
   });
 
   final String albumName;
-  final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -268,19 +264,12 @@ class _AlbumChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 12,
-              color: isSelected
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.outline,
-            ),
-            const SizedBox(width: 4),
             Flexible(
               child: Text(
                 albumName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: isSelected
                       ? theme.colorScheme.onPrimary

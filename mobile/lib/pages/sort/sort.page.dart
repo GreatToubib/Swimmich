@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/presentation/sort/storage_badge.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
@@ -46,6 +47,12 @@ class SortPage extends HookConsumerWidget {
       },
       [queueAsync.valueOrNull?.currentIndex],
     );
+
+    // Ensure album names are available for quick-pick chip labels.
+    useEffect(() {
+      ref.read(remoteAlbumProvider.notifier).refresh();
+      return null;
+    }, const []);
 
     return Scaffold(
       appBar: const ImmichAppBar(showUploadButton: false),
@@ -285,7 +292,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   String get _directionLabel => switch (_activeAction) {
         SortAction.delete => 'Delete',
         SortAction.reviewLater => 'Later',
-        SortAction.sorted => 'Sorted',
+        SortAction.sorted => 'Sort',
         null => '',
       };
 
