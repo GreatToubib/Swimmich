@@ -4,17 +4,25 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/entities/asset.entity.dart';
+import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
 import 'package:immich_mobile/presentation/sort/storage_badge.dart';
+import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
-import 'package:immich_mobile/widgets/common/immich_thumbnail.dart';
+import 'package:immich_mobile/widgets/common/immich_app_bar.dart';
 import 'package:openapi/api.dart';
+
+AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
+      AssetTypeEnum.IMAGE => AssetType.image,
+      AssetTypeEnum.VIDEO => AssetType.video,
+      AssetTypeEnum.AUDIO => AssetType.audio,
+      _ => AssetType.other,
+    };
 
 @RoutePage()
 class SortPage extends HookConsumerWidget {
@@ -39,31 +47,35 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    return queueAsync.when(
-      loading: () => const _LoadingView(),
-      error: (e, _) =>
-          _ErrorView(error: e.toString(), onRetry: notifier.refresh),
-      data: (queue) => queue.current == null
-          ? _AllCaughtUpView(
-              onRefresh: () async {
-                await ref
-                    .read(swimmichBootstrapServiceProvider)
-                    .checkForNewAssets();
-                await notifier.refresh();
-              },
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: _SortDeckView(
-                    asset: queue.current!,
-                    remaining: queue.remaining,
-                    nextAsset: queue.nextAsset,
+    return Scaffold(
+      appBar: const ImmichAppBar(showUploadButton: false),
+      backgroundColor: Colors.black,
+      body: queueAsync.when(
+        loading: () => const _LoadingView(),
+        error: (e, _) =>
+            _ErrorView(error: e.toString(), onRetry: notifier.refresh),
+        data: (queue) => queue.current == null
+            ? _AllCaughtUpView(
+                onRefresh: () async {
+                  await ref
+                      .read(swimmichBootstrapServiceProvider)
+                      .checkForNewAssets();
+                  await notifier.refresh();
+                },
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: _SortDeckView(
+                      asset: queue.current!,
+                      remaining: queue.remaining,
+                      nextAsset: queue.nextAsset,
+                    ),
                   ),
-                ),
-                const QuickPickRow(),
-              ],
-            ),
+                  const QuickPickRow(),
+                ],
+              ),
+      ),
     );
   }
 }
@@ -75,9 +87,7 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 }
 
@@ -91,33 +101,37 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                'Could not load photos',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Could not load photos',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
         ),
       ),
     );
@@ -133,40 +147,36 @@ class _AllCaughtUpView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('🎉', style: TextStyle(fontSize: 56)),
-              const SizedBox(height: 16),
-              Text(
-                'All caught up!',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No new photos to sort right now.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.6),
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                onPressed: onRefresh,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Check again'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🎉', style: TextStyle(fontSize: 56)),
+            const SizedBox(height: 16),
+            Text(
+              'All caught up!',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No new photos to sort right now.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white60,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Check again'),
+            ),
+          ],
         ),
       ),
     );
@@ -261,6 +271,24 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   double get _overlayOpacity => (_drag.distance / 140).clamp(0.0, 0.55);
   double get _rotation => _drag.dx / 700;
 
+  IconData get _directionIcon => switch (_activeAction) {
+        SortAction.delete => Icons.delete_rounded,
+        SortAction.reviewLater => Icons.schedule_rounded,
+        SortAction.sorted => Icons.check_circle_rounded,
+        null => _drag.dx < 0
+            ? Icons.delete_rounded
+            : _drag.dx > 0
+                ? Icons.check_circle_rounded
+                : Icons.schedule_rounded,
+      };
+
+  String get _directionLabel => switch (_activeAction) {
+        SortAction.delete => 'Delete',
+        SortAction.reviewLater => 'Later',
+        SortAction.sorted => 'Sorted',
+        null => '',
+      };
+
   // ── Gesture callbacks ──────────────────────────────────────────────────────
 
   void _onPanUpdate(DragUpdateDetails d) {
@@ -345,19 +373,21 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     });
     _flyController.reset();
 
-    // 3. Push undo record and show SnackBar.
+    // 3. Push undo record; show SnackBar only for delete.
     final assetId = widget.asset.id;
     final qpIds = ref.read(quickPickProvider).selected.toList();
     final record =
         UndoRecord(asset: widget.asset, action: action, quickPickIds: qpIds);
     ref.read(undoStackProvider.notifier).push(record);
 
-    if (mounted) {
+    if (action == SortAction.delete && mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_undoLabel(action)),
-          duration: const Duration(seconds: 5),
+          content: const Text('Photo deleted'),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(bottom: 160, left: 16, right: 16),
           action: SnackBarAction(
             label: 'Undo',
             onPressed: () => _executeUndo(record),
@@ -388,12 +418,6 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     }
   }
 
-  String _undoLabel(SortAction action) => switch (action) {
-        SortAction.delete => 'Photo deleted',
-        SortAction.reviewLater => 'Saved for later',
-        SortAction.sorted => 'Photo sorted',
-      };
-
   Future<void> _executeUndo(UndoRecord record) async {
     ref.read(undoStackProvider.notifier).pop();
     ref.read(sortQueueProvider.notifier).insertAtCurrent(record.asset);
@@ -420,11 +444,14 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
         scale: scale,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: ImmichThumbnail(
-            asset: Asset.remote(asset),
+          child: Image(
+            image: RemoteImageProvider.thumbnail(
+              assetId: asset.id,
+              thumbhash: asset.thumbhash ?? '',
+            ),
+            fit: BoxFit.contain,
             width: size.width,
             height: size.height,
-            fit: BoxFit.contain,
           ),
         ),
       ),
@@ -436,16 +463,18 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final activeAction = _activeAction;
 
     Widget mainCard = Stack(
       children: [
-        // Photo.
+        // Photo — full preview quality with progressive loading.
         Positioned.fill(
-          child: ImmichThumbnail(
-            asset: Asset.remote(widget.asset),
-            width: size.width,
-            height: size.height,
+          child: Image(
+            image: RemoteFullImageProvider(
+              assetId: widget.asset.id,
+              thumbhash: widget.asset.thumbhash ?? '',
+              assetType: _toAssetType(widget.asset.type),
+              isAnimated: widget.asset.livePhotoVideoId != null,
+            ),
             fit: BoxFit.contain,
           ),
         ),
@@ -456,6 +485,34 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             child: IgnorePointer(
               child: Container(
                 color: _overlayColor!.withValues(alpha: _overlayOpacity),
+              ),
+            ),
+          ),
+
+        // Swipe action icon + label (fades in during drag).
+        if (_drag.distance > 15)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: (_drag.distance / 100).clamp(0.0, 1.0),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_directionIcon, color: Colors.white, size: 80),
+                      const SizedBox(height: 8),
+                      Text(
+                        _directionLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          shadows: [Shadow(blurRadius: 4)],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -472,14 +529,6 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           top: MediaQuery.paddingOf(context).top + 12,
           right: 16,
           child: _CountChip(remaining: widget.remaining),
-        ),
-
-        // Swipe-hint buttons.
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: MediaQuery.paddingOf(context).bottom + 24,
-          child: _SwipeHintBar(activeAction: activeAction),
         ),
       ],
     );
@@ -516,22 +565,19 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
-        child: Stack(
-          children: [
-            // Peek card behind the main card.
-            if (widget.nextAsset != null)
-              Positioned.fill(
-                child: _buildPeekCard(widget.nextAsset!, size),
-              ),
-            // Main (draggable) card on top.
-            Positioned.fill(child: mainCard),
-          ],
-        ),
+    return GestureDetector(
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      child: Stack(
+        children: [
+          // Peek card behind the main card.
+          if (widget.nextAsset != null)
+            Positioned.fill(
+              child: _buildPeekCard(widget.nextAsset!, size),
+            ),
+          // Main (draggable) card on top.
+          Positioned.fill(child: mainCard),
+        ],
       ),
     );
   }
@@ -555,95 +601,6 @@ class _CountChip extends StatelessWidget {
       child: Text(
         '$remaining left',
         style: const TextStyle(color: Colors.white, fontSize: 13),
-      ),
-    );
-  }
-}
-
-// ─── Swipe-hint bar ───────────────────────────────────────────────────────────
-
-class _SwipeHintBar extends StatelessWidget {
-  const _SwipeHintBar({required this.activeAction});
-
-  final SortAction? activeAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _HintButton(
-          icon: Icons.delete_outline,
-          label: 'Delete',
-          color: Colors.red.shade300,
-          isActive: activeAction == SortAction.delete,
-        ),
-        _HintButton(
-          icon: Icons.schedule_outlined,
-          label: 'Later',
-          color: Colors.amber.shade300,
-          isActive: activeAction == SortAction.reviewLater,
-        ),
-        _HintButton(
-          icon: Icons.check_circle_outline,
-          label: 'Sorted',
-          color: Colors.green.shade300,
-          isActive: activeAction == SortAction.sorted,
-        ),
-      ],
-    );
-  }
-}
-
-class _HintButton extends StatelessWidget {
-  const _HintButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.isActive,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: isActive ? 1.2 : 1.0,
-      duration: const Duration(milliseconds: 100),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 100),
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isActive
-                  ? color.withValues(alpha: 0.25)
-                  : Colors.black45,
-              border: Border.all(
-                color: color,
-                width: isActive ? 2.5 : 1.5,
-              ),
-            ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isActive ? Colors.white : Colors.white70,
-              fontSize: 11,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              height: 1.2,
-            ),
-          ),
-        ],
       ),
     );
   }

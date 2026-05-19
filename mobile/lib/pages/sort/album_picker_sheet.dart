@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/domain/models/album/album.model.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 
@@ -36,6 +35,16 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   bool _isCreating = false;
   String? _createError;
 
+  List<Album>? _allAlbums;
+  bool _loading = true;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAlbums();
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -44,12 +53,35 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     super.dispose();
   }
 
-  List<RemoteAlbum> _filtered(List<RemoteAlbum> albums) {
-    return albums
-        .where((a) => !a.name.startsWith('_'))
-        .where(
-          (a) => a.name.toLowerCase().contains(_filter.toLowerCase()),
-        )
+  Future<void> _fetchAlbums() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final albums =
+          await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      if (mounted) {
+        setState(() {
+          _allAlbums = albums;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  List<Album> get _filtered {
+    final all = _allAlbums ?? [];
+    return all
+        .where((a) => !a.name.startsWith('_') && a.remoteId != null)
+        .where((a) => a.name.toLowerCase().contains(_filter.toLowerCase()))
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
   }
@@ -66,8 +98,8 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
 
-    final albums = ref.read(remoteAlbumProvider).albums;
-    if (albums.any((a) => a.name == trimmed)) {
+    final all = _allAlbums ?? [];
+    if (all.any((a) => a.name == trimmed)) {
       setState(() => _createError = 'Album "$trimmed" already exists');
       return;
     }
@@ -80,9 +112,12 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     try {
       final album = await ref
           .read(albumApiRepositoryProvider)
-          .createDriftAlbum(trimmed, assetIds: const []);
-      unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
-      ref.read(quickPickProvider.notifier).toggle(album.id);
+          .create(trimmed, assetIds: const []);
+      final remoteId = album.remoteId;
+      if (remoteId != null) {
+        ref.read(quickPickProvider.notifier).toggle(remoteId);
+      }
+      await _fetchAlbums();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       setState(() {
@@ -94,8 +129,6 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final albums = ref.watch(remoteAlbumProvider).albums;
-    final filtered = _filtered(albums);
     final qp = ref.watch(quickPickProvider);
 
     return DraggableScrollableSheet(
@@ -170,33 +203,56 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
           ),
           const Divider(height: 1),
           Expanded(
-            child: ListView.builder(
-              controller: controller,
-              itemCount: filtered.length,
-              itemBuilder: (_, i) {
-                final album = filtered[i];
-                final isSelected = qp.selected.contains(album.id);
-                return ListTile(
-                  leading: Icon(
-                    Icons.photo_album_outlined,
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                  title: Text(album.name),
-                  trailing: isSelected
-                      ? Icon(Icons.check,
-                          color: Theme.of(context).colorScheme.primary)
-                      : null,
-                  onTap: () {
-                    ref
-                        .read(quickPickProvider.notifier)
-                        .toggle(album.id);
-                    Navigator.of(context).pop();
-                  },
-                );
-              },
-            ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Failed to load albums',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _fetchAlbums,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: controller,
+                        itemCount: _filtered.length,
+                        itemBuilder: (_, i) {
+                          final album = _filtered[i];
+                          final albumId = album.remoteId!;
+                          final isSelected = qp.selected.contains(albumId);
+                          return ListTile(
+                            leading: Icon(
+                              Icons.photo_album_outlined,
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : null,
+                            ),
+                            title: Text(album.name),
+                            trailing: isSelected
+                                ? Icon(
+                                    Icons.check,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  )
+                                : null,
+                            onTap: () {
+                              ref
+                                  .read(quickPickProvider.notifier)
+                                  .toggle(albumId);
+                              Navigator.of(context).pop();
+                            },
+                          );
+                        },
+                      ),
           ),
         ],
       ),
