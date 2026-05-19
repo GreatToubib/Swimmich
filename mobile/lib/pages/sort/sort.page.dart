@@ -473,6 +473,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
 
     Widget mainCard = Stack(
       children: [
+        // Solid background so portrait photos don't reveal the peek card.
+        const Positioned.fill(child: ColoredBox(color: Colors.black)),
+
         // Photo — full preview quality with progressive loading.
         Positioned.fill(
           child: Image(
@@ -577,8 +580,8 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       onPanEnd: _onPanEnd,
       child: Stack(
         children: [
-          // Peek card behind the main card.
-          if (widget.nextAsset != null)
+          // Peek card behind the main card — only shown while dragging.
+          if (widget.nextAsset != null && (_drag != Offset.zero || _isAnimating))
             Positioned.fill(
               child: _buildPeekCard(widget.nextAsset!, size),
             ),

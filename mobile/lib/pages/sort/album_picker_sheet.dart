@@ -1,8 +1,9 @@
-import 'dart:async';
+import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/album.entity.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
@@ -122,6 +123,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
         ref.read(quickPickProvider.notifier).toggle(remoteId);
       }
       await _fetchAlbums();
+      unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
       setState(() {
         _isCreating = false;
         _showCreateField = false;

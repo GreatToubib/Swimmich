@@ -297,8 +297,13 @@ class _PinPickerSheet extends StatelessWidget {
   final List<RemoteAlbum> albums;
   final String? currentId;
 
+  List<RemoteAlbum> get _filtered =>
+      albums.where((a) => !a.name.startsWith('_')).toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.5,
@@ -324,9 +329,9 @@ class _PinPickerSheet extends StatelessWidget {
           Expanded(
             child: ListView.builder(
               controller: controller,
-              itemCount: albums.length,
+              itemCount: filtered.length,
               itemBuilder: (_, i) {
-                final album = albums[i];
+                final album = filtered[i];
                 final isCurrent = album.id == currentId;
                 return ListTile(
                   leading: Icon(
