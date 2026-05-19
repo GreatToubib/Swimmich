@@ -100,6 +100,9 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
     if (!Store.isBetaTimelineEnabled) {
       switch (_ref.read(tabProvider)) {
+        case TabEnum.sort:
+          break; // no background refresh needed for sort queue
+
         case TabEnum.home:
           await _ref.read(assetProvider.notifier).getAllAsset();
 
