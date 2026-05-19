@@ -152,8 +152,27 @@ class SwimmichBootstrapService {
 
   static const _kLastSeenAtKey = 'swimmich.last_seen_at';
 
-  /// Incremental check: finds assets created after the last known timestamp and
-  /// adds them to the _New album so they appear in the sort deck.
+  /// Builds the set of asset IDs already in any system album except _New.
+  /// Used to avoid re-adding sorted/reviewed assets back into _New.
+  Future<Set<String>> _buildManagedSet() async {
+    final managed = <String>{};
+    for (final album in SwimmichSystemAlbum.values) {
+      if (album == SwimmichSystemAlbum.newAssets) continue;
+      final id = await _storage.read(album.storageKey);
+      if (id == null) continue;
+      try {
+        final dto = await _albumsApi.getAlbumInfo(id);
+        if (dto == null) continue;
+        for (final asset in dto.assets) { managed.add(asset.id); }
+      } catch (e, st) {
+        _log.warning('Failed to enumerate album ${album.albumName}', e, st);
+      }
+    }
+    return managed;
+  }
+
+  /// Incremental check: finds assets created after the last known timestamp
+  /// that are not already in a system album, and adds them to _New.
   Future<void> checkForNewAssets() async {
     final newId = await _storage.read(SwimmichSystemAlbum.newAssets.storageKey);
     if (newId == null) return; // bootstrap not yet run
@@ -161,6 +180,8 @@ class SwimmichBootstrapService {
     final lastSeenRaw = await _storage.read(_kLastSeenAtKey);
     final lastSeen =
         lastSeenRaw != null ? DateTime.tryParse(lastSeenRaw) : null;
+
+    final managed = await _buildManagedSet();
 
     int page = 1;
     const pageSize = 100;
@@ -174,7 +195,10 @@ class SwimmichBootstrapService {
         ),
       );
       if (resp == null) break;
-      final ids = resp.assets.items.map((a) => a.id).toList();
+      final ids = resp.assets.items
+          .where((a) => !managed.contains(a.id))
+          .map((a) => a.id)
+          .toList();
       if (ids.isNotEmpty) await _albumApi.addAssets(newId, ids);
       if (resp.assets.nextPage == null) break;
       page++;

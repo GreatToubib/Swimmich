@@ -12,6 +12,7 @@ import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
+import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:immich_mobile/widgets/common/immich_thumbnail.dart';
 import 'package:openapi/api.dart';
 
@@ -43,7 +44,14 @@ class SortPage extends HookConsumerWidget {
       error: (e, _) =>
           _ErrorView(error: e.toString(), onRetry: notifier.refresh),
       data: (queue) => queue.current == null
-          ? _AllCaughtUpView(onRefresh: notifier.refresh)
+          ? _AllCaughtUpView(
+              onRefresh: () async {
+                await ref
+                    .read(swimmichBootstrapServiceProvider)
+                    .checkForNewAssets();
+                await notifier.refresh();
+              },
+            )
           : Column(
               children: [
                 Expanded(
