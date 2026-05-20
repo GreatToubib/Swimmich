@@ -260,6 +260,12 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// Star rating selected by the user for the current card (0 = none, 1–3).
   int _starRating = 0;
 
+  /// The asset's membership when the card opened (edit mode), used to compute
+  /// what to remove when the user de-selects albums / changes the rating.
+  Set<String> _originalUserAlbumIds = const {};
+  int _originalStarRating = 0;
+  bool _wasInNew = false;
+
   /// Prevents the haptic from firing on every frame at threshold.
   bool _hapticFired = false;
 
@@ -312,6 +318,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// build phase.
   void _resetAndPrefill() {
     final assetId = widget.asset.id;
+    _originalUserAlbumIds = const {};
+    _originalStarRating = 0;
+    _wasInNew = false;
     Future.microtask(() async {
       if (!mounted) return;
       setState(() => _starRating = 0);
@@ -339,6 +348,8 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       final twoId = await storage.read(SwimmichSystemAlbum.twoStar.storageKey);
       final threeId =
           await storage.read(SwimmichSystemAlbum.threeStar.storageKey);
+      final newId =
+          await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
 
       int rating = 0;
       if (threeId != null && memberIds.contains(threeId)) {
@@ -355,6 +366,11 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           memberIds.where((id) => !systemIds.contains(id)).toSet();
 
       if (!mounted || widget.asset.id != assetId) return;
+      // Remember the opening state so a sort can reconcile (remove de-selected
+      // albums / clear an old star rating).
+      _originalUserAlbumIds = userMembers;
+      _originalStarRating = rating;
+      _wasInNew = newId != null && memberIds.contains(newId);
       ref.read(quickPickProvider.notifier).setSelection(userMembers);
       setState(() => _starRating = rating);
     } catch (_) {
@@ -490,6 +506,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     final assetId = widget.asset.id;
     final qpIds = ref.read(quickPickProvider).selected.toList();
     final starRating = _starRating;
+    final previousQpIds = _originalUserAlbumIds.toList();
+    final previousStar = _originalStarRating;
+    final wasInNew = _wasInNew;
 
     // Reset drag state. The rating/selection for the next card are reset and
     // re-filled by didUpdateWidget → _resetAndPrefill once it slides in.
@@ -505,7 +524,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       asset: widget.asset,
       action: action,
       quickPickIds: qpIds,
+      previousQuickPickIds: previousQpIds,
       starRating: starRating,
+      previousStarRating: previousStar,
+      wasInNew: wasInNew,
     );
     ref.read(undoStackProvider.notifier).push(record);
 
@@ -531,7 +553,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             assetId,
             action,
             quickPickAlbumIds: action == SortAction.sorted ? qpIds : const [],
-            starRating: action == SortAction.sorted ? starRating : 0,
+            previousQuickPickAlbumIds:
+                action == SortAction.sorted ? previousQpIds : const [],
+            starRating: action == SortAction.sorted ? starRating : null,
           );
       if (action == SortAction.sorted && mounted) {
         ref.read(quickPickProvider.notifier).recordUsage(qpIds);
