@@ -15,6 +15,7 @@ import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
+import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
@@ -51,9 +52,21 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    // Ensure album names are available for quick-pick chip labels.
+    // Ensure album names are available for quick-pick chip labels, and prune
+    // any pinned/recent chips whose albums were deleted on the server.
     useEffect(() {
       ref.read(remoteAlbumProvider.notifier).refresh();
+      Future.microtask(() async {
+        try {
+          final albums =
+              await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+          final ids =
+              albums.map((a) => a.remoteId).whereType<String>().toSet();
+          await ref.read(quickPickProvider.notifier).pruneDeleted(ids);
+        } catch (_) {
+          // Offline or transient failure — leave chips as-is.
+        }
+      });
       return null;
     }, const []);
 

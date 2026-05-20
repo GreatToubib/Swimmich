@@ -66,21 +66,31 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
 
   // ─── Private helpers ─────────────────────────────────────────────────────
 
-  /// The album ids to pull from. Falls back to New + Review Later when the user
-  /// selection is still empty (e.g. before async defaults have resolved).
+  /// The album ids to pull from, in display-priority order: New first, then
+  /// Review Later, then any other selected albums. The deck drains them in this
+  /// order so cards appear grouped (all New, then Review, then the rest).
+  ///
+  /// Falls back to New + Review Later when the user selection is still empty
+  /// (e.g. before async defaults have resolved).
   Future<List<String>> _albumIds() async {
     final selected = ref.read(sortSourceAlbumsProvider);
-    if (selected.isNotEmpty) return selected.toList();
-
     final storage = ref.read(secureStorageRepositoryProvider);
-    final ids = <String>[];
     final newId =
         await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
     final rlId =
         await storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
-    if (newId != null) ids.add(newId);
-    if (rlId != null) ids.add(rlId);
-    return ids;
+
+    if (selected.isEmpty) {
+      return [if (newId != null) newId, if (rlId != null) rlId];
+    }
+
+    final ordered = <String>[];
+    if (newId != null && selected.contains(newId)) ordered.add(newId);
+    if (rlId != null && selected.contains(rlId)) ordered.add(rlId);
+    for (final id in selected) {
+      if (id != newId && id != rlId) ordered.add(id);
+    }
+    return ordered;
   }
 
   Future<SortQueueState> _initLoad() async {
@@ -95,11 +105,14 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     return _fetchNextBatch(const []);
   }
 
-  /// Fetches the next page from every non-exhausted source album and merges
-  /// the results into [existing] as a UNION (deduped by asset id).
+  /// Fetches the next page from the highest-priority non-exhausted source album
+  /// and appends new (deduped) assets to [existing]. Albums are drained one at
+  /// a time in priority order (New → Review Later → others), so cards appear
+  /// grouped by source rather than interleaved.
   ///
   /// Immich's metadata search treats multiple `albumIds` as an intersection,
   /// so each album is queried independently with its own page cursor.
+  /// [_cursors] preserves insertion (= priority) order.
   Future<SortQueueState> _fetchNextBatch(
       List<AssetResponseDto> existing) async {
     final seen = existing.map((a) => a.id).toSet();
@@ -107,7 +120,10 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     final search = ref.read(apiServiceProvider).searchApi;
 
     try {
-      for (final albumId in _cursors.keys.toList()) {
+      // Keep pulling pages from the current top-priority album until it yields
+      // at least one new card or every album is exhausted.
+      while (_cursors.isNotEmpty && merged.length == existing.length) {
+        final albumId = _cursors.keys.first;
         final page = _cursors[albumId]!;
         final resp = await search.searchAssets(
           MetadataSearchDto(

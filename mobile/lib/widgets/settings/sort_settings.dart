@@ -56,8 +56,8 @@ class SortSettings extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
           child: Text(
-            'Pinned albums appear as the first 3 chips while sorting. '
-            'Slots 4-6 auto-fill from your most recently used albums.',
+            'Pinned albums appear as the first 4 chips while sorting. '
+            'The RECENT row auto-fills from your most recently used albums.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
@@ -66,6 +66,7 @@ class SortSettings extends ConsumerWidget {
         pinnedTile(0),
         pinnedTile(1),
         pinnedTile(2),
+        pinnedTile(3),
       ],
     );
   }

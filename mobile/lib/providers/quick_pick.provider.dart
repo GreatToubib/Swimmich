@@ -8,8 +8,8 @@ import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 const _kPinnedKey = 'swimmich.quickpick.pinned';
 const _kMruKey = 'swimmich.quickpick.mru';
 const _kMaxMruAge = Duration(days: 30);
-const _kMruSlots = 3;
-const _kPinnedSlots = 3;
+const _kMruSlots = 4;
+const _kPinnedSlots = 4;
 
 // ─── Models ─────────────────────────────────────────────────────────────────
 
@@ -50,8 +50,8 @@ class QuickPickState {
   /// Album IDs that are currently toggled ON (multi-select).
   final Set<String> selected;
 
-  /// The 6 chips to display: first the 3 pinned slots (may be null for empty),
-  /// then up to 3 MRU entries. Only non-null chips are returned.
+  /// The chips to display: first the [_kPinnedSlots] pinned slots (may be null
+  /// for empty), then up to [_kMruSlots] MRU entries, padded with nulls.
   List<QuickPickChip?> get chips {
     final result = <QuickPickChip?>[];
     for (final id in pinned) {
@@ -85,7 +85,7 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
   QuickPickNotifier(this._storage)
       : super(
           const QuickPickState(
-            pinned: [null, null, null],
+            pinned: [null, null, null, null],
             mru: [],
             selected: {},
           ),
@@ -101,8 +101,8 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
     final pinnedRaw = await _storage.read(_kPinnedKey);
     final mruRaw = await _storage.read(_kMruKey);
 
-    // Pinned: comma-separated, 3 entries, empty string = null slot.
-    List<String?> pinned = [null, null, null];
+    // Pinned: comma-separated, [_kPinnedSlots] entries, empty string = null.
+    List<String?> pinned = List<String?>.filled(_kPinnedSlots, null);
     if (pinnedRaw != null && pinnedRaw.isNotEmpty) {
       final parts = pinnedRaw.split(',');
       for (int i = 0; i < _kPinnedSlots && i < parts.length; i++) {
@@ -157,6 +157,36 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
     final mru = state.mru.where((m) => m.albumId != albumId).toList();
     state = state.copyWith(pinned: next, mru: mru);
     await _persist();
+  }
+
+  /// Remove pinned/MRU references to albums that no longer exist on the server.
+  /// [existingIds] is the set of live album ids. Deleted pinned slots become
+  /// empty; deleted MRU entries are dropped. No-op when nothing changed.
+  Future<void> pruneDeleted(Set<String> existingIds) async {
+    final pinned = state.pinned
+        .map((id) => (id != null && existingIds.contains(id)) ? id : null)
+        .toList();
+    final mru =
+        state.mru.where((m) => existingIds.contains(m.albumId)).toList();
+
+    final pinnedChanged = !_listEquals(pinned, state.pinned);
+    final mruChanged = mru.length != state.mru.length;
+    if (!pinnedChanged && !mruChanged) return;
+
+    // Also drop any now-dangling ids from the live selection.
+    final selected =
+        state.selected.where(existingIds.contains).toSet();
+
+    state = state.copyWith(pinned: pinned, mru: mru, selected: selected);
+    await _persist();
+  }
+
+  static bool _listEquals(List<String?> a, List<String?> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   /// Record usage of the given album IDs (call after a successful sort action).

@@ -65,9 +65,9 @@ class QuickPickRow extends ConsumerWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                for (int i = 0; i < 3; i++) ...[
+                for (int i = 0; i < 4; i++) ...[
                   Expanded(child: pinnedChip(i)),
-                  if (i < 2) const SizedBox(width: 6),
+                  if (i < 3) const SizedBox(width: 6),
                 ],
               ],
             ),
@@ -85,9 +85,9 @@ class QuickPickRow extends ConsumerWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                for (int i = 0; i < 3; i++) ...[
-                  Expanded(child: mruChip(i + 3)),
-                  if (i < 2) const SizedBox(width: 6),
+                for (int i = 0; i < 4; i++) ...[
+                  Expanded(child: mruChip(i + 4)),
+                  if (i < 3) const SizedBox(width: 6),
                 ],
               ],
             ),
@@ -114,7 +114,7 @@ class QuickPickRow extends ConsumerWidget {
       isScrollControlled: true,
       builder: (_) => _PinPickerSheet(
         albums: filtered,
-        currentId: slot < 3 ? qp.pinned[slot] : null,
+        currentId: slot < qp.pinned.length ? qp.pinned[slot] : null,
       ),
     );
     if (selected != null) {
