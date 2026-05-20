@@ -65,19 +65,16 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   // ─── Private helpers ─────────────────────────────────────────────────────
 
   Future<List<String>> _albumIds() async {
-    final filter = ref.read(sortSourceFilterProvider);
+    final source = ref.read(sortSourceFilterProvider);
     final storage = ref.read(secureStorageRepositoryProvider);
-    final ids = <String>[];
-    if (filter.contains(SortSource.newAssets)) {
-      final id = await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
-      if (id != null) ids.add(id);
-    }
-    if (filter.contains(SortSource.reviewLater)) {
-      final id =
-          await storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
-      if (id != null) ids.add(id);
-    }
-    return ids;
+    // Single source at a time. Immich's metadata search ANDs multiple albumIds,
+    // so we only ever pass exactly one album id to get OR-like "show this album".
+    final key = switch (source) {
+      SortSource.newAssets => SwimmichSystemAlbum.newAssets.storageKey,
+      SortSource.reviewLater => SwimmichSystemAlbum.reviewLater.storageKey,
+    };
+    final id = await storage.read(key);
+    return id != null ? [id] : <String>[];
   }
 
   Future<SortQueueState> _load(List<AssetResponseDto> existing) async {

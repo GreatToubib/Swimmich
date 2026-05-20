@@ -57,40 +57,36 @@ class SortPage extends HookConsumerWidget {
     }, const []);
 
     return Scaffold(
-      appBar: const ImmichAppBar(showUploadButton: false),
+      appBar: const ImmichAppBar(
+        showUploadButton: false,
+        actions: [_SourceToggle()],
+      ),
       backgroundColor: Colors.black,
-      body: Column(
-        children: [
-          const _SourceFilterBar(),
-          Expanded(
-            child: queueAsync.when(
-              loading: () => const _LoadingView(),
-              error: (e, _) =>
-                  _ErrorView(error: e.toString(), onRetry: notifier.refresh),
-              data: (queue) => queue.current == null
-                  ? _AllCaughtUpView(
-                      onRefresh: () async {
-                        await ref
-                            .read(swimmichBootstrapServiceProvider)
-                            .checkForNewAssets();
-                        await notifier.refresh();
-                      },
-                    )
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: _SortDeckView(
-                            asset: queue.current!,
-                            remaining: queue.remaining,
-                            nextAsset: queue.nextAsset,
-                          ),
-                        ),
-                        const QuickPickRow(),
-                      ],
+      body: queueAsync.when(
+        loading: () => const _LoadingView(),
+        error: (e, _) =>
+            _ErrorView(error: e.toString(), onRetry: notifier.refresh),
+        data: (queue) => queue.current == null
+            ? _AllCaughtUpView(
+                onRefresh: () async {
+                  await ref
+                      .read(swimmichBootstrapServiceProvider)
+                      .checkForNewAssets();
+                  await notifier.refresh();
+                },
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: _SortDeckView(
+                      asset: queue.current!,
+                      remaining: queue.remaining,
+                      nextAsset: queue.nextAsset,
                     ),
-            ),
-          ),
-        ],
+                  ),
+                  const QuickPickRow(),
+                ],
+              ),
       ),
     );
   }
@@ -626,40 +622,59 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   }
 }
 
-// ─── Source filter bar ───────────────────────────────────────────────────────
+// ─── Source toggle (app-bar header) ──────────────────────────────────────────
 
-class _SourceFilterBar extends ConsumerWidget {
-  const _SourceFilterBar();
+/// Compact two-segment toggle shown in the Sort page header, between the Immich
+/// logo and the profile button. Selects which single source album the deck
+/// pulls from — New or Review Later (mutually exclusive).
+class _SourceToggle extends ConsumerWidget {
+  const _SourceToggle();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(sortSourceFilterProvider);
+    final source = ref.watch(sortSourceFilterProvider);
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
 
-    void toggle(SortSource source) {
-      final current = ref.read(sortSourceFilterProvider);
-      if (current.contains(source) && current.length == 1) return;
-      final next = Set<SortSource>.from(current);
-      next.contains(source) ? next.remove(source) : next.add(source);
-      ref.read(sortSourceFilterProvider.notifier).state = next;
+    Widget segment(String label, SortSource value) {
+      final selected = source == value;
+      return GestureDetector(
+        onTap: () =>
+            ref.read(sortSourceFilterProvider.notifier).state = value,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.4),
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          FilterChip(
-            label: const Text('New'),
-            selected: filter.contains(SortSource.newAssets),
-            onSelected: (_) => toggle(SortSource.newAssets),
-            visualDensity: VisualDensity.compact,
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: const Text('Review'),
-            selected: filter.contains(SortSource.reviewLater),
-            onSelected: (_) => toggle(SortSource.reviewLater),
-            visualDensity: VisualDensity.compact,
-          ),
+          segment('New', SortSource.newAssets),
+          segment('Review', SortSource.reviewLater),
         ],
       ),
     );
