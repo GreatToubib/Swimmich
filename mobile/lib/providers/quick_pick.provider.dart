@@ -148,6 +148,11 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
   /// Clear the current selection (call after a successful sort action).
   void clearSelection() => state = state.copyWith(selected: {});
 
+  /// Replace the whole selection. Used to pre-select the user albums an asset
+  /// already belongs to when it enters the sort deck (edit mode).
+  void setSelection(Set<String> albumIds) =>
+      state = state.copyWith(selected: albumIds);
+
   /// Set or clear a pinned slot (slot 0-2).
   Future<void> setPinned(int slot, String? albumId) async {
     assert(slot >= 0 && slot < _kPinnedSlots);
