@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:ui' show lerpDouble;
 
 import 'package:auto_route/auto_route.dart';
@@ -17,6 +18,7 @@ import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/providers/system_album_ids.provider.dart';
+import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
@@ -31,6 +33,23 @@ AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
       AssetTypeEnum.AUDIO => AssetType.audio,
       _ => AssetType.other,
     };
+
+/// Refreshes the album cache (for chip labels) and prunes any pinned/recent
+/// quick-pick chips whose album has been deleted on the server. Called on Sort
+/// page mount and again every time the Sort tab is re-opened, since the tab is
+/// kept alive and would otherwise never re-check.
+Future<void> _refreshAlbumsAndPrune(WidgetRef ref) async {
+  unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
+  final albumApi = ref.read(albumApiRepositoryProvider);
+  final quickPick = ref.read(quickPickProvider.notifier);
+  try {
+    final albums = await albumApi.getAll(shared: null);
+    final ids = albums.map((a) => a.remoteId).whereType<String>().toSet();
+    await quickPick.pruneDeleted(ids);
+  } catch (_) {
+    // Offline or transient failure — leave chips as-is.
+  }
+}
 
 @RoutePage()
 class SortPage extends HookConsumerWidget {
@@ -55,23 +74,20 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    // Ensure album names are available for quick-pick chip labels, and prune
-    // any pinned/recent chips whose albums were deleted on the server.
+    // On first mount: load album names and prune deleted quick-pick chips.
     useEffect(() {
-      ref.read(remoteAlbumProvider.notifier).refresh();
-      Future.microtask(() async {
-        try {
-          final albums =
-              await ref.read(albumApiRepositoryProvider).getAll(shared: null);
-          final ids =
-              albums.map((a) => a.remoteId).whereType<String>().toSet();
-          await ref.read(quickPickProvider.notifier).pruneDeleted(ids);
-        } catch (_) {
-          // Offline or transient failure — leave chips as-is.
-        }
-      });
+      unawaited(_refreshAlbumsAndPrune(ref));
       return null;
     }, const []);
+
+    // The Sort tab is kept alive by AutoTabsRouter, so this page does not
+    // remount when re-opened. Re-run the refresh+prune each time the Sort tab
+    // becomes active, to catch albums deleted on the server in the meantime.
+    ref.listen<TabEnum>(tabProvider, (prev, next) {
+      if (next == TabEnum.sort && prev != TabEnum.sort) {
+        unawaited(_refreshAlbumsAndPrune(ref));
+      }
+    });
 
     return Scaffold(
       appBar: const ImmichAppBar(
