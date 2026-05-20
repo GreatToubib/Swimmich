@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/pages/sort/sort_source_sheet.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
 import 'package:immich_mobile/presentation/sort/star_rating_bar.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
@@ -59,7 +60,7 @@ class SortPage extends HookConsumerWidget {
     return Scaffold(
       appBar: const ImmichAppBar(
         showUploadButton: false,
-        actions: [_SourceToggle()],
+        actions: [_SourceButton()],
       ),
       backgroundColor: Colors.black,
       body: queueAsync.when(
@@ -622,84 +623,24 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   }
 }
 
-// ─── Source toggle (app-bar header) ──────────────────────────────────────────
+// ─── Source button (app-bar header) ──────────────────────────────────────────
 
-/// Sleek sliding toggle shown in the Sort page header, between the Immich logo
-/// and the profile button. A single animated thumb slides between the two
-/// states — New or Review Later (mutually exclusive, like a feature switch).
-class _SourceToggle extends ConsumerWidget {
-  const _SourceToggle();
-
-  static const double _segWidth = 76;
-  static const double _height = 34;
+/// Compact icon button shown in the Sort page header, between the Immich logo
+/// and the profile button. Opens the source-album selection sheet; a small
+/// badge shows how many source albums are currently selected.
+class _SourceButton extends ConsumerWidget {
+  const _SourceButton();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final source = ref.watch(sortSourceFilterProvider);
-    final theme = Theme.of(context);
-    final isNew = source == SortSource.newAssets;
-
-    void select(SortSource v) =>
-        ref.read(sortSourceFilterProvider.notifier).state = v;
-
-    Widget label(String text, bool selected) => SizedBox(
-          width: _segWidth,
-          height: _height,
-          child: Center(
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected
-                    ? theme.colorScheme.onPrimary
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.65),
-              ),
-              child: Text(text),
-            ),
-          ),
-        );
-
-    return Container(
-      height: _height,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(_height / 2),
-      ),
-      child: Stack(
-        children: [
-          // Sliding thumb — animates between the two segments.
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: isNew ? Alignment.centerLeft : Alignment.centerRight,
-            child: Container(
-              width: _segWidth,
-              height: _height,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(_height / 2),
-              ),
-            ),
-          ),
-          // Tappable labels on top of the thumb.
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => select(SortSource.newAssets),
-                child: label('New', isNew),
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => select(SortSource.reviewLater),
-                child: label('Review', !isNew),
-              ),
-            ],
-          ),
-        ],
+    final count = ref.watch(sortSourceAlbumsProvider).length;
+    return IconButton(
+      tooltip: 'Albums to sort',
+      onPressed: () => showSortSourceSheet(context, ref),
+      icon: Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        child: const Icon(Icons.filter_list),
       ),
     );
   }
