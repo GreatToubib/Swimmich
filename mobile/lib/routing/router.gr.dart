@@ -2756,6 +2756,22 @@ class SharedLinkRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [SortPage]
+class SortRoute extends PageRouteInfo<void> {
+  const SortRoute({List<PageRouteInfo>? children})
+    : super(SortRoute.name, initialChildren: children);
+
+  static const String name = 'SortRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const SortPage();
+    },
+  );
+}
+
+/// generated route for
 /// [SplashScreenPage]
 class SplashScreenRoute extends PageRouteInfo<void> {
   const SplashScreenRoute({List<PageRouteInfo>? children})
