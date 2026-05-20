@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:ui' show lerpDouble;
 
 import 'package:auto_route/auto_route.dart';
@@ -17,6 +18,7 @@ import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/providers/system_album_ids.provider.dart';
+import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
@@ -31,6 +33,27 @@ AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
       AssetTypeEnum.AUDIO => AssetType.audio,
       _ => AssetType.other,
     };
+
+/// Refreshes the album cache (for chip labels) and prunes any pinned/recent
+/// quick-pick chips whose album has been deleted on the server. Called on Sort
+/// page mount and again every time the Sort tab is re-opened, since the tab is
+/// kept alive and would otherwise never re-check.
+Future<void> _refreshAlbumsAndPrune(WidgetRef ref) async {
+  unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
+  final albumApi = ref.read(albumApiRepositoryProvider);
+  final quickPick = ref.read(quickPickProvider.notifier);
+  try {
+    final albums = await albumApi.getAll(shared: null);
+    final ids = albums.map((a) => a.remoteId).whereType<String>().toSet();
+    // Wait for the persisted pinned/recent state to load — on a cold start the
+    // prune would otherwise run against the empty initial state and miss the
+    // dead albums until the next tab switch.
+    await quickPick.loaded;
+    await quickPick.pruneDeleted(ids);
+  } catch (_) {
+    // Offline or transient failure — leave chips as-is.
+  }
+}
 
 @RoutePage()
 class SortPage extends HookConsumerWidget {
@@ -55,23 +78,20 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    // Ensure album names are available for quick-pick chip labels, and prune
-    // any pinned/recent chips whose albums were deleted on the server.
+    // On first mount: load album names and prune deleted quick-pick chips.
     useEffect(() {
-      ref.read(remoteAlbumProvider.notifier).refresh();
-      Future.microtask(() async {
-        try {
-          final albums =
-              await ref.read(albumApiRepositoryProvider).getAll(shared: null);
-          final ids =
-              albums.map((a) => a.remoteId).whereType<String>().toSet();
-          await ref.read(quickPickProvider.notifier).pruneDeleted(ids);
-        } catch (_) {
-          // Offline or transient failure — leave chips as-is.
-        }
-      });
+      unawaited(_refreshAlbumsAndPrune(ref));
       return null;
     }, const []);
+
+    // The Sort tab is kept alive by AutoTabsRouter, so this page does not
+    // remount when re-opened. Re-run the refresh+prune each time the Sort tab
+    // becomes active, to catch albums deleted on the server in the meantime.
+    ref.listen<TabEnum>(tabProvider, (prev, next) {
+      if (next == TabEnum.sort && prev != TabEnum.sort) {
+        unawaited(_refreshAlbumsAndPrune(ref));
+      }
+    });
 
     return Scaffold(
       appBar: const ImmichAppBar(
@@ -240,6 +260,12 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// Star rating selected by the user for the current card (0 = none, 1–3).
   int _starRating = 0;
 
+  /// The asset's membership when the card opened (edit mode), used to compute
+  /// what to remove when the user de-selects albums / changes the rating.
+  Set<String> _originalUserAlbumIds = const {};
+  int _originalStarRating = 0;
+  bool _wasInNew = false;
+
   /// Prevents the haptic from firing on every frame at threshold.
   bool _hapticFired = false;
 
@@ -292,6 +318,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// build phase.
   void _resetAndPrefill() {
     final assetId = widget.asset.id;
+    _originalUserAlbumIds = const {};
+    _originalStarRating = 0;
+    _wasInNew = false;
     Future.microtask(() async {
       if (!mounted) return;
       setState(() => _starRating = 0);
@@ -319,6 +348,8 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       final twoId = await storage.read(SwimmichSystemAlbum.twoStar.storageKey);
       final threeId =
           await storage.read(SwimmichSystemAlbum.threeStar.storageKey);
+      final newId =
+          await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
 
       int rating = 0;
       if (threeId != null && memberIds.contains(threeId)) {
@@ -335,6 +366,11 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           memberIds.where((id) => !systemIds.contains(id)).toSet();
 
       if (!mounted || widget.asset.id != assetId) return;
+      // Remember the opening state so a sort can reconcile (remove de-selected
+      // albums / clear an old star rating).
+      _originalUserAlbumIds = userMembers;
+      _originalStarRating = rating;
+      _wasInNew = newId != null && memberIds.contains(newId);
       ref.read(quickPickProvider.notifier).setSelection(userMembers);
       setState(() => _starRating = rating);
     } catch (_) {
@@ -470,6 +506,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     final assetId = widget.asset.id;
     final qpIds = ref.read(quickPickProvider).selected.toList();
     final starRating = _starRating;
+    final previousQpIds = _originalUserAlbumIds.toList();
+    final previousStar = _originalStarRating;
+    final wasInNew = _wasInNew;
 
     // Reset drag state. The rating/selection for the next card are reset and
     // re-filled by didUpdateWidget → _resetAndPrefill once it slides in.
@@ -485,7 +524,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       asset: widget.asset,
       action: action,
       quickPickIds: qpIds,
+      previousQuickPickIds: previousQpIds,
       starRating: starRating,
+      previousStarRating: previousStar,
+      wasInNew: wasInNew,
     );
     ref.read(undoStackProvider.notifier).push(record);
 
@@ -511,7 +553,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             assetId,
             action,
             quickPickAlbumIds: action == SortAction.sorted ? qpIds : const [],
-            starRating: action == SortAction.sorted ? starRating : 0,
+            previousQuickPickAlbumIds:
+                action == SortAction.sorted ? previousQpIds : const [],
+            starRating: action == SortAction.sorted ? starRating : null,
           );
       if (action == SortAction.sorted && mounted) {
         ref.read(quickPickProvider.notifier).recordUsage(qpIds);

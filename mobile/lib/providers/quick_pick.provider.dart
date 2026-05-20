@@ -90,10 +90,16 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
             selected: {},
           ),
         ) {
-    _load();
+    _loaded = _load();
   }
 
   final SecureStorageRepository _storage;
+
+  /// Completes once the persisted pinned/recent state has been read from
+  /// storage. Callers (e.g. the deleted-album prune) await this so they don't
+  /// run against the still-empty initial state on a cold start.
+  late final Future<void> _loaded;
+  Future<void> get loaded => _loaded;
 
   // ── Initialise from secure storage ────────────────────────────────────────
 
