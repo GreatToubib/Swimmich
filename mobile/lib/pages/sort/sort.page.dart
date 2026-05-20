@@ -624,57 +624,81 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
 
 // ─── Source toggle (app-bar header) ──────────────────────────────────────────
 
-/// Compact two-segment toggle shown in the Sort page header, between the Immich
-/// logo and the profile button. Selects which single source album the deck
-/// pulls from — New or Review Later (mutually exclusive).
+/// Sleek sliding toggle shown in the Sort page header, between the Immich logo
+/// and the profile button. A single animated thumb slides between the two
+/// states — New or Review Later (mutually exclusive, like a feature switch).
 class _SourceToggle extends ConsumerWidget {
   const _SourceToggle();
+
+  static const double _segWidth = 76;
+  static const double _height = 34;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final source = ref.watch(sortSourceFilterProvider);
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final isNew = source == SortSource.newAssets;
 
-    Widget segment(String label, SortSource value) {
-      final selected = source == value;
-      return GestureDetector(
-        onTap: () =>
-            ref.read(sortSourceFilterProvider.notifier).state = value,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: selected ? primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.onSurface,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              fontSize: 13,
+    void select(SortSource v) =>
+        ref.read(sortSourceFilterProvider.notifier).state = v;
+
+    Widget label(String text, bool selected) => SizedBox(
+          width: _segWidth,
+          height: _height,
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.65),
+              ),
+              child: Text(text),
             ),
           ),
-        ),
-      );
-    }
+        );
 
     return Container(
-      padding: const EdgeInsets.all(2),
+      height: _height,
       decoration: BoxDecoration(
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.4),
-        ),
-        borderRadius: BorderRadius.circular(22),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(_height / 2),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          segment('New', SortSource.newAssets),
-          segment('Review', SortSource.reviewLater),
+          // Sliding thumb — animates between the two segments.
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            alignment: isNew ? Alignment.centerLeft : Alignment.centerRight,
+            child: Container(
+              width: _segWidth,
+              height: _height,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(_height / 2),
+              ),
+            ),
+          ),
+          // Tappable labels on top of the thumb.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => select(SortSource.newAssets),
+                child: label('New', isNew),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => select(SortSource.reviewLater),
+                child: label('Review', !isNew),
+              ),
+            ],
+          ),
         ],
       ),
     );
