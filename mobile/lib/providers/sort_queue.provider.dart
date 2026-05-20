@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:logging/logging.dart';
@@ -50,45 +51,111 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   static const _prefetchAhead = 5;
   static const _loadMoreThreshold = 5;
 
-  int _page = 1;
+  /// Per-album page cursor (next page to fetch). An album removed from this map
+  /// is exhausted (no more pages).
+  final Map<String, int> _cursors = {};
   final _log = Logger('SortQueueNotifier');
 
   @override
-  Future<SortQueueState> build() => _load([]);
+  Future<SortQueueState> build() {
+    // Auto-rebuild when the selected source albums change.
+    ref.watch(sortSourceAlbumsProvider);
+    _cursors.clear();
+    return _initLoad();
+  }
 
   // ─── Private helpers ─────────────────────────────────────────────────────
 
-  Future<String?> _newAlbumId() => ref
-      .read(secureStorageRepositoryProvider)
-      .read(SwimmichSystemAlbum.newAssets.storageKey);
+  /// The album ids to pull from, in display-priority order: New first, then
+  /// Review Later, then any other selected albums. The deck drains them in this
+  /// order so cards appear grouped (all New, then Review, then the rest).
+  ///
+  /// Falls back to New + Review Later when the user selection is still empty
+  /// (e.g. before async defaults have resolved).
+  Future<List<String>> _albumIds() async {
+    final selected = ref.read(sortSourceAlbumsProvider);
+    final storage = ref.read(secureStorageRepositoryProvider);
+    final newId =
+        await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+    final rlId =
+        await storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
 
-  Future<SortQueueState> _load(List<AssetResponseDto> existing) async {
-    final albumId = await _newAlbumId();
-    if (albumId == null) {
-      _log.warning('_New album id not found — bootstrap may not have run yet');
+    if (selected.isEmpty) {
+      return [if (newId != null) newId, if (rlId != null) rlId];
+    }
+
+    final ordered = <String>[];
+    if (newId != null && selected.contains(newId)) ordered.add(newId);
+    if (rlId != null && selected.contains(rlId)) ordered.add(rlId);
+    for (final id in selected) {
+      if (id != newId && id != rlId) ordered.add(id);
+    }
+    return ordered;
+  }
+
+  Future<SortQueueState> _initLoad() async {
+    final albumIds = await _albumIds();
+    if (albumIds.isEmpty) {
+      _log.warning('No source album ids found — bootstrap may not have run yet');
       return const SortQueueState(assets: [], hasMore: false);
     }
+    for (final id in albumIds) {
+      _cursors[id] = 1;
+    }
+    return _fetchNextBatch(const []);
+  }
+
+  /// Fetches the next page from the highest-priority non-exhausted source album
+  /// and appends new (deduped) assets to [existing]. Albums are drained one at
+  /// a time in priority order (New → Review Later → others), so cards appear
+  /// grouped by source rather than interleaved.
+  ///
+  /// Immich's metadata search treats multiple `albumIds` as an intersection,
+  /// so each album is queried independently with its own page cursor.
+  /// [_cursors] preserves insertion (= priority) order.
+  Future<SortQueueState> _fetchNextBatch(
+      List<AssetResponseDto> existing) async {
+    final seen = existing.map((a) => a.id).toSet();
+    final merged = <AssetResponseDto>[...existing];
+    final search = ref.read(apiServiceProvider).searchApi;
 
     try {
-      final resp = await ref.read(apiServiceProvider).searchApi.searchAssets(
-            MetadataSearchDto(
-              albumIds: [albumId],
-              page: _page,
-              size: _pageSize,
-              withDeleted: false,
-            ),
-          );
-      if (resp == null) return SortQueueState(assets: existing, hasMore: false);
-      final items = resp.assets.items;
-      return SortQueueState(
-        assets: [...existing, ...items],
-        currentIndex: existing.isEmpty ? 0 : existing.length,
-        hasMore: resp.assets.nextPage != null,
-      );
+      // Keep pulling pages from the current top-priority album until it yields
+      // at least one new card or every album is exhausted.
+      while (_cursors.isNotEmpty && merged.length == existing.length) {
+        final albumId = _cursors.keys.first;
+        final page = _cursors[albumId]!;
+        final resp = await search.searchAssets(
+          MetadataSearchDto(
+            albumIds: [albumId],
+            page: page,
+            size: _pageSize,
+            withDeleted: false,
+          ),
+        );
+        if (resp == null) {
+          _cursors.remove(albumId);
+          continue;
+        }
+        for (final asset in resp.assets.items) {
+          if (seen.add(asset.id)) merged.add(asset);
+        }
+        if (resp.assets.nextPage == null) {
+          _cursors.remove(albumId);
+        } else {
+          _cursors[albumId] = page + 1;
+        }
+      }
     } catch (e, st) {
-      _log.severe('Failed to load _New album assets', e, st);
+      _log.severe('Failed to load sort queue assets', e, st);
       rethrow;
     }
+
+    return SortQueueState(
+      assets: merged,
+      currentIndex: existing.isEmpty ? 0 : existing.length,
+      hasMore: _cursors.isNotEmpty,
+    );
   }
 
   // ─── Public API ──────────────────────────────────────────────────────────
@@ -101,10 +168,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
 
     final next = s.currentIndex + 1;
 
-    // Transparently load the next page when running low.
+    // Transparently load the next batch when running low.
     if (s.hasMore && (s.assets.length - next) < _loadMoreThreshold) {
-      _page++;
-      final updated = await _load(s.assets);
+      final updated = await _fetchNextBatch(s.assets);
       state = AsyncData(updated.copyWith(currentIndex: next));
       return;
     }
@@ -129,11 +195,11 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     state = AsyncData(s.copyWith(currentIndex: s.currentIndex - 1));
   }
 
-  /// Reset the queue and reload from page 1.
+  /// Reset the queue and reload from the first page of every source album.
   Future<void> refresh() async {
-    _page = 1;
+    _cursors.clear();
     state = const AsyncLoading();
-    state = AsyncData(await _load([]));
+    state = AsyncData(await _initLoad());
   }
 
   /// Pre-warm the image cache for the next [_prefetchAhead] cards.

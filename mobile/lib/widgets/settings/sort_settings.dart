@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 
 /// Settings widget for configuring the 3 pinned quick-pick album slots.
@@ -55,8 +56,8 @@ class SortSettings extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
           child: Text(
-            'Pinned albums appear as the first 3 chips while sorting. '
-            'Slots 4-6 auto-fill from your most recently used albums.',
+            'Pinned albums appear as the first 4 chips while sorting. '
+            'The RECENT row auto-fills from your most recently used albums.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
@@ -65,6 +66,7 @@ class SortSettings extends ConsumerWidget {
         pinnedTile(0),
         pinnedTile(1),
         pinnedTile(2),
+        pinnedTile(3),
       ],
     );
   }
@@ -111,12 +113,17 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
   Future<void> _load() async {
     try {
-      final all =
-          await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      final results = await Future.wait([
+        ref.read(albumApiRepositoryProvider).getAll(shared: null),
+        ref.read(systemAlbumIdsProvider.future),
+      ]);
+      final all = results[0] as List<Album>;
+      final systemIds = results[1] as Set<String>;
       if (mounted) {
         setState(() {
           _albums = all
-              .where((a) => !a.name.startsWith('_') && a.remoteId != null)
+              .where((a) =>
+                  a.remoteId != null && !systemIds.contains(a.remoteId))
               .toList()
             ..sort((a, b) => a.name.compareTo(b.name));
           _loading = false;

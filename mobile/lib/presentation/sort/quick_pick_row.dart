@@ -4,6 +4,7 @@ import 'package:immich_mobile/domain/models/album/album.model.dart';
 import 'package:immich_mobile/pages/sort/album_picker_sheet.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 
 /// Two-row album chip section below the sort card.
 ///
@@ -64,9 +65,9 @@ class QuickPickRow extends ConsumerWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                for (int i = 0; i < 3; i++) ...[
+                for (int i = 0; i < 4; i++) ...[
                   Expanded(child: pinnedChip(i)),
-                  if (i < 2) const SizedBox(width: 6),
+                  if (i < 3) const SizedBox(width: 6),
                 ],
               ],
             ),
@@ -84,9 +85,9 @@ class QuickPickRow extends ConsumerWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                for (int i = 0; i < 3; i++) ...[
-                  Expanded(child: mruChip(i + 3)),
-                  if (i < 2) const SizedBox(width: 6),
+                for (int i = 0; i < 4; i++) ...[
+                  Expanded(child: mruChip(i + 4)),
+                  if (i < 3) const SizedBox(width: 6),
                 ],
               ],
             ),
@@ -104,12 +105,16 @@ class QuickPickRow extends ConsumerWidget {
     required QuickPickState qp,
   }) async {
     if (albums.isEmpty) return;
+    // Filter system albums by ID — robust against emoji names.
+    final systemIds = await ref.read(systemAlbumIdsProvider.future);
+    final filtered = albums.where((a) => !systemIds.contains(a.id)).toList();
+
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _PinPickerSheet(
-        albums: albums,
-        currentId: slot < 3 ? qp.pinned[slot] : null,
+        albums: filtered,
+        currentId: slot < qp.pinned.length ? qp.pinned[slot] : null,
       ),
     );
     if (selected != null) {
