@@ -45,6 +45,10 @@ Future<void> _refreshAlbumsAndPrune(WidgetRef ref) async {
   try {
     final albums = await albumApi.getAll(shared: null);
     final ids = albums.map((a) => a.remoteId).whereType<String>().toSet();
+    // Wait for the persisted pinned/recent state to load — on a cold start the
+    // prune would otherwise run against the empty initial state and miss the
+    // dead albums until the next tab switch.
+    await quickPick.loaded;
     await quickPick.pruneDeleted(ids);
   } catch (_) {
     // Offline or transient failure — leave chips as-is.

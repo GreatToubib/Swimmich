@@ -1,4 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
@@ -26,11 +28,39 @@ class UndoRecord {
 /// All operations are idempotent on duplicate calls (adding to an album
 /// where the asset already lives is a no-op on the server).
 class SortActionService {
-  const SortActionService(this._assetRepo, this._albumRepo, this._storage);
+  const SortActionService(
+    this._assetRepo,
+    this._albumRepo,
+    this._storage,
+    this._driftAlbumRepo,
+  );
 
   final AssetApiRepository _assetRepo;
   final AlbumApiRepository _albumRepo;
   final SecureStorageRepository _storage;
+  final DriftRemoteAlbumRepository _driftAlbumRepo;
+
+  /// Adds an asset to an album on the server, then mirrors the change into the
+  /// local Drift DB so the Albums view reflects it without a full re-sync.
+  /// The local mirror is best-effort: a failure (e.g. album/asset not yet in
+  /// the local cache) must never fail the authoritative server operation.
+  Future<void> _albumAdd(String albumId, String assetId) async {
+    await _albumRepo.addAssets(albumId, [assetId]);
+    try {
+      await _driftAlbumRepo.addAssets(albumId, [assetId]);
+    } catch (_) {
+      // Local cache will catch up on the next remote sync.
+    }
+  }
+
+  Future<void> _albumRemove(String albumId, String assetId) async {
+    await _albumRepo.removeAssets(albumId, [assetId]);
+    try {
+      await _driftAlbumRepo.removeAssets(albumId, [assetId]);
+    } catch (_) {
+      // Local cache will catch up on the next remote sync.
+    }
+  }
 
   Future<void> execute(
     String assetId,
@@ -47,45 +77,45 @@ class SortActionService {
         await _assetRepo.delete([assetId], false);
         final rlIdDel =
             await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
-        if (rlIdDel != null) await _albumRepo.removeAssets(rlIdDel, [assetId]);
-        if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
+        if (rlIdDel != null) await _albumRemove(rlIdDel, assetId);
+        if (newId != null) await _albumRemove(newId, assetId);
 
       case SortAction.reviewLater:
         final id =
             await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
-        if (id != null) await _albumRepo.addAssets(id, [assetId]);
-        if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
+        if (id != null) await _albumAdd(id, assetId);
+        if (newId != null) await _albumRemove(newId, assetId);
 
       case SortAction.sorted:
         // Remove from both source albums (photo may have come from either).
         final rlIdSorted =
             await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
         if (rlIdSorted != null) {
-          await _albumRepo.removeAssets(rlIdSorted, [assetId]);
+          await _albumRemove(rlIdSorted, assetId);
         }
         for (final qId in quickPickAlbumIds) {
-          await _albumRepo.addAssets(qId, [assetId]);
+          await _albumAdd(qId, assetId);
         }
         // Star albums — cumulative: 2★ adds to both _1 Star and _2 Star.
         if (starRating >= 1) {
           final oneId =
               await _storage.read(SwimmichSystemAlbum.oneStar.storageKey);
-          if (oneId != null) await _albumRepo.addAssets(oneId, [assetId]);
+          if (oneId != null) await _albumAdd(oneId, assetId);
         }
         if (starRating >= 2) {
           final twoId =
               await _storage.read(SwimmichSystemAlbum.twoStar.storageKey);
-          if (twoId != null) await _albumRepo.addAssets(twoId, [assetId]);
+          if (twoId != null) await _albumAdd(twoId, assetId);
         }
         if (starRating >= 3) {
           final threeId =
               await _storage.read(SwimmichSystemAlbum.threeStar.storageKey);
-          if (threeId != null) await _albumRepo.addAssets(threeId, [assetId]);
+          if (threeId != null) await _albumAdd(threeId, assetId);
         }
         if (starRating > 0) {
           await _assetRepo.updateFavorite([assetId], true);
         }
-        if (newId != null) await _albumRepo.removeAssets(newId, [assetId]);
+        if (newId != null) await _albumRemove(newId, assetId);
     }
   }
 
@@ -96,45 +126,45 @@ class SortActionService {
       case SortAction.delete:
         await _assetRepo.restoreTrash([record.asset.id]);
         if (newId != null) {
-          await _albumRepo.addAssets(newId, [record.asset.id]);
+          await _albumAdd(newId, record.asset.id);
         }
 
       case SortAction.reviewLater:
         final id =
             await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
-        if (id != null) await _albumRepo.removeAssets(id, [record.asset.id]);
-        if (newId != null) await _albumRepo.addAssets(newId, [record.asset.id]);
+        if (id != null) await _albumRemove(id, record.asset.id);
+        if (newId != null) await _albumAdd(newId, record.asset.id);
 
       case SortAction.sorted:
         for (final qId in record.quickPickIds) {
-          await _albumRepo.removeAssets(qId, [record.asset.id]);
+          await _albumRemove(qId, record.asset.id);
         }
         // Reverse star albums.
         if (record.starRating >= 1) {
           final oneId =
               await _storage.read(SwimmichSystemAlbum.oneStar.storageKey);
           if (oneId != null) {
-            await _albumRepo.removeAssets(oneId, [record.asset.id]);
+            await _albumRemove(oneId, record.asset.id);
           }
         }
         if (record.starRating >= 2) {
           final twoId =
               await _storage.read(SwimmichSystemAlbum.twoStar.storageKey);
           if (twoId != null) {
-            await _albumRepo.removeAssets(twoId, [record.asset.id]);
+            await _albumRemove(twoId, record.asset.id);
           }
         }
         if (record.starRating >= 3) {
           final threeId =
               await _storage.read(SwimmichSystemAlbum.threeStar.storageKey);
           if (threeId != null) {
-            await _albumRepo.removeAssets(threeId, [record.asset.id]);
+            await _albumRemove(threeId, record.asset.id);
           }
         }
         if (record.starRating > 0) {
           await _assetRepo.updateFavorite([record.asset.id], false);
         }
-        if (newId != null) await _albumRepo.addAssets(newId, [record.asset.id]);
+        if (newId != null) await _albumAdd(newId, record.asset.id);
     }
   }
 }
@@ -144,5 +174,6 @@ final sortActionServiceProvider = Provider<SortActionService>(
     ref.watch(assetApiRepositoryProvider),
     ref.watch(albumApiRepositoryProvider),
     ref.watch(secureStorageRepositoryProvider),
+    ref.watch(remoteAlbumRepository),
   ),
 );
