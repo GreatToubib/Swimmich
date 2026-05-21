@@ -34,6 +34,7 @@ import { SmartInfoService } from 'src/services/smart-info.service';
 import { StackService } from 'src/services/stack.service';
 import { StorageTemplateService } from 'src/services/storage-template.service';
 import { StorageService } from 'src/services/storage.service';
+import { SwimmichSystemAlbumService } from 'src/services/swimmich-system-album.service';
 import { SyncService } from 'src/services/sync.service';
 import { SystemConfigService } from 'src/services/system-config.service';
 import { SystemMetadataService } from 'src/services/system-metadata.service';
@@ -84,6 +85,7 @@ export const services = [
   StackService,
   StorageService,
   StorageTemplateService,
+  SwimmichSystemAlbumService,
   SyncService,
   SystemConfigService,
   SystemMetadataService,

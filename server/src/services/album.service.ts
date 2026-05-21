@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import {
   AddUsersDto,
   AlbumInfoDto,
@@ -161,6 +161,10 @@ export class AlbumService extends BaseService {
 
   async delete(auth: AuthDto, id: string): Promise<void> {
     await this.requireAccess({ auth, permission: Permission.AlbumDelete, ids: [id] });
+    const album = await this.findOrFail(id, { withAssets: false });
+    if (album.systemKind) {
+      throw new ForbiddenException('This is a Swimmich system album and cannot be deleted.');
+    }
     await this.albumRepository.delete(id);
   }
 
