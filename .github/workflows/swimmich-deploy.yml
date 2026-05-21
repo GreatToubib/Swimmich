@@ -1,0 +1,78 @@
+name: Swimmich Build & Deploy
+
+# Builds the custom immich-server image (server + web + cli + plugins) from the
+# branch that was pushed and publishes it to GHCR.
+#   push to swimmich-test -> :test  + auto-deploy to the test server
+#   push to swimmich      -> :prod  (build only; prod is deployed manually)
+on:
+  push:
+    branches: [swimmich, swimmich-test]
+  workflow_dispatch:
+
+concurrency:
+  group: swimmich-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/greattoubib/swimmich-server
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force || true
+
+      - name: Compute tags
+        id: meta
+        run: |
+          sha="${GITHUB_SHA::7}"
+          if [ "${GITHUB_REF_NAME}" = "swimmich" ]; then
+            echo "tags=${IMAGE}:prod,${IMAGE}:prod-${sha}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=${IMAGE}:test,${IMAGE}:test-${sha}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push immich-server
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-test:
+    needs: build-and-push
+    if: github.ref_name == 'swimmich-test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger test deploy over SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          # The CI key is locked to a forced command; "deploy test" is the only
+          # accepted SSH_ORIGINAL_COMMAND on the server.
+          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "deploy test"
