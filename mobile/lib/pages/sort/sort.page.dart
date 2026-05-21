@@ -18,6 +18,7 @@ import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/providers/system_album_ids.provider.dart';
+import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
@@ -532,18 +533,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     ref.read(undoStackProvider.notifier).push(record);
 
     if (action == SortAction.delete && mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Photo deleted'),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.only(bottom: 160, left: 16, right: 16),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () => _executeUndo(record),
-          ),
-        ),
+      showSwimmichUndoBanner(
+        context,
+        message: 'Photo deleted',
+        onUndo: () => _executeUndo(record),
       );
     }
 
