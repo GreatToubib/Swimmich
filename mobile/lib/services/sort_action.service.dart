@@ -1,10 +1,9 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
-import 'package:immich_mobile/repositories/secure_storage.repository.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:openapi/api.dart';
 
 enum SortAction { delete, reviewLater, sorted }
@@ -48,14 +47,17 @@ class SortActionService {
   const SortActionService(
     this._assetRepo,
     this._albumRepo,
-    this._storage,
+    this._albumsApi,
     this._driftAlbumRepo,
   );
 
   final AssetApiRepository _assetRepo;
   final AlbumApiRepository _albumRepo;
-  final SecureStorageRepository _storage;
+  final AlbumsApi _albumsApi;
   final DriftRemoteAlbumRepository _driftAlbumRepo;
+
+  String? _kindId(List<AlbumResponseDto>? albums, String kind) =>
+      albums?.where((a) => a.systemKind == kind).map((a) => a.id).firstOrNull;
 
   /// Adds an asset to an album on the server, then mirrors the change into the
   /// local Drift DB so the Albums view reflects it without a full re-sync.
@@ -83,11 +85,15 @@ class SortActionService {
   /// it ends up in only the matching star album (or none for 0), and its
   /// favorite flag tracks whether it has any stars. Star albums are exclusive
   /// — a 3★ photo lives in ⭐⭐⭐ only, not also in ⭐ and ⭐⭐.
-  Future<void> _applyStarRating(String assetId, int rating) async {
+  Future<void> _applyStarRating(
+    List<AlbumResponseDto>? albums,
+    String assetId,
+    int rating,
+  ) async {
     final byRating = <int, String?>{
-      1: await _storage.read(SwimmichSystemAlbum.oneStar.storageKey),
-      2: await _storage.read(SwimmichSystemAlbum.twoStar.storageKey),
-      3: await _storage.read(SwimmichSystemAlbum.threeStar.storageKey),
+      1: _kindId(albums, 'one_star'),
+      2: _kindId(albums, 'two_star'),
+      3: _kindId(albums, 'three_star'),
     };
     for (final entry in byRating.entries) {
       final albumId = entry.value;
@@ -108,29 +114,26 @@ class SortActionService {
     List<String> previousQuickPickAlbumIds = const [],
     int? starRating,
   }) async {
-    final newId =
-        await _storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+    final allAlbums = await _albumsApi.getAllAlbums();
+    final newId = _kindId(allAlbums, 'new');
 
     switch (action) {
       case SortAction.delete:
         // Soft-delete (trash); force: false keeps it recoverable.
         await _assetRepo.delete([assetId], false);
-        final rlIdDel =
-            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        final rlIdDel = _kindId(allAlbums, 'review_later');
         if (rlIdDel != null) await _albumRemove(rlIdDel, assetId);
         if (newId != null) await _albumRemove(newId, assetId);
 
       case SortAction.reviewLater:
-        final id =
-            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        final id = _kindId(allAlbums, 'review_later');
         if (id != null) await _albumAdd(id, assetId);
         if (newId != null) await _albumRemove(newId, assetId);
 
       case SortAction.sorted:
         // Remove from the review-later source album (photo may have come from
         // there).
-        final rlIdSorted =
-            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        final rlIdSorted = _kindId(allAlbums, 'review_later');
         if (rlIdSorted != null) {
           await _albumRemove(rlIdSorted, assetId);
         }
@@ -150,7 +153,7 @@ class SortActionService {
         // Star albums (exclusive). Skipped entirely when [starRating] is null
         // (e.g. the album-picker "Sort" button, which doesn't manage stars).
         if (starRating != null) {
-          await _applyStarRating(assetId, starRating);
+          await _applyStarRating(allAlbums, assetId, starRating);
         }
 
         if (newId != null) await _albumRemove(newId, assetId);
@@ -158,7 +161,8 @@ class SortActionService {
   }
 
   Future<void> undo(UndoRecord record) async {
-    final newId = await _storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+    final allAlbums = await _albumsApi.getAllAlbums();
+    final newId = _kindId(allAlbums, 'new');
     final assetId = record.asset.id;
 
     switch (record.action) {
@@ -169,8 +173,7 @@ class SortActionService {
         }
 
       case SortAction.reviewLater:
-        final id =
-            await _storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+        final id = _kindId(allAlbums, 'review_later');
         if (id != null) await _albumRemove(id, assetId);
         if (newId != null) await _albumAdd(newId, assetId);
 
@@ -188,7 +191,7 @@ class SortActionService {
 
         // Restore the previous star rating if this sort changed it.
         if (record.starRating != record.previousStarRating) {
-          await _applyStarRating(assetId, record.previousStarRating);
+          await _applyStarRating(allAlbums, assetId, record.previousStarRating);
         }
 
         // Put it back in _New only if it came from there.
@@ -203,7 +206,7 @@ final sortActionServiceProvider = Provider<SortActionService>(
   (ref) => SortActionService(
     ref.watch(assetApiRepositoryProvider),
     ref.watch(albumApiRepositoryProvider),
-    ref.watch(secureStorageRepositoryProvider),
+    ref.watch(apiServiceProvider).albumsApi,
     ref.watch(remoteAlbumRepository),
   ),
 );

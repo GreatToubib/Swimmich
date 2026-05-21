@@ -1,6 +1,5 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/repositories/secure_storage.repository.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 
 /// The set of album IDs the sort deck pulls photos from.
 ///
@@ -8,7 +7,7 @@ import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 /// appears in the deck). Immich's metadata search ANDs multiple albumIds, so
 /// the sort queue queries each album separately and merges the results.
 ///
-/// Defaults to New + Review Later, resolved from secure storage on first build.
+/// Defaults to New + Review Later, resolved from the server on first build.
 /// An empty selection is treated as "use the defaults" by the queue, and the
 /// picker prevents deselecting the last album.
 class SortSourceAlbumsNotifier extends Notifier<Set<String>> {
@@ -19,11 +18,16 @@ class SortSourceAlbumsNotifier extends Notifier<Set<String>> {
   }
 
   Future<void> _loadDefaults() async {
-    final storage = ref.read(secureStorageRepositoryProvider);
-    final newId =
-        await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
-    final rlId =
-        await storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+    final allAlbums =
+        await ref.read(apiServiceProvider).albumsApi.getAllAlbums();
+
+    String? kindId(String kind) => allAlbums
+        ?.where((a) => a.systemKind == kind)
+        .map((a) => a.id)
+        .firstOrNull;
+
+    final newId = kindId('new');
+    final rlId = kindId('review_later');
     final ids = <String>{
       if (newId != null) newId,
       if (rlId != null) rlId,

@@ -31,6 +31,7 @@ class AlbumResponseDto {
     required this.ownerId,
     required this.shared,
     this.startDate,
+    this.systemKind,
     required this.updatedAt,
   });
 
@@ -108,6 +109,15 @@ class AlbumResponseDto {
   ///
   DateTime? startDate;
 
+  /// Swimmich system album kind
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  String? systemKind;
+
   /// Last update date
   DateTime updatedAt;
 
@@ -131,6 +141,7 @@ class AlbumResponseDto {
     other.ownerId == ownerId &&
     other.shared == shared &&
     other.startDate == startDate &&
+    other.systemKind == systemKind &&
     other.updatedAt == updatedAt;
 
   @override
@@ -154,10 +165,11 @@ class AlbumResponseDto {
     (ownerId.hashCode) +
     (shared.hashCode) +
     (startDate == null ? 0 : startDate!.hashCode) +
+    (systemKind == null ? 0 : systemKind!.hashCode) +
     (updatedAt.hashCode);
 
   @override
-  String toString() => 'AlbumResponseDto[albumName=$albumName, albumThumbnailAssetId=$albumThumbnailAssetId, albumUsers=$albumUsers, assetCount=$assetCount, assets=$assets, contributorCounts=$contributorCounts, createdAt=$createdAt, description=$description, endDate=$endDate, hasSharedLink=$hasSharedLink, id=$id, isActivityEnabled=$isActivityEnabled, lastModifiedAssetTimestamp=$lastModifiedAssetTimestamp, order=$order, owner=$owner, ownerId=$ownerId, shared=$shared, startDate=$startDate, updatedAt=$updatedAt]';
+  String toString() => 'AlbumResponseDto[albumName=$albumName, albumThumbnailAssetId=$albumThumbnailAssetId, albumUsers=$albumUsers, assetCount=$assetCount, assets=$assets, contributorCounts=$contributorCounts, createdAt=$createdAt, description=$description, endDate=$endDate, hasSharedLink=$hasSharedLink, id=$id, isActivityEnabled=$isActivityEnabled, lastModifiedAssetTimestamp=$lastModifiedAssetTimestamp, order=$order, owner=$owner, ownerId=$ownerId, shared=$shared, startDate=$startDate, systemKind=$systemKind, updatedAt=$updatedAt]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -199,6 +211,11 @@ class AlbumResponseDto {
     } else {
     //  json[r'startDate'] = null;
     }
+    if (this.systemKind != null) {
+      json[r'systemKind'] = this.systemKind;
+    } else {
+    //  json[r'systemKind'] = null;
+    }
       json[r'updatedAt'] = this.updatedAt.toUtc().toIso8601String();
     return json;
   }
@@ -230,6 +247,7 @@ class AlbumResponseDto {
         ownerId: mapValueOfType<String>(json, r'ownerId')!,
         shared: mapValueOfType<bool>(json, r'shared')!,
         startDate: mapDateTime(json, r'startDate', r''),
+        systemKind: mapValueOfType<String>(json, r'systemKind'),
         updatedAt: mapDateTime(json, r'updatedAt', r'')!,
       );
     }

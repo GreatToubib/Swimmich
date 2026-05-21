@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
-import 'package:immich_mobile/repositories/secure_storage.repository.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 
 /// Opens the source-album selection sheet. Photos from every selected album
 /// are merged (union) into the sort deck. New + Review Later are selected by
@@ -21,6 +20,14 @@ Future<void> showSortSourceSheet(BuildContext context, WidgetRef ref) {
 
 /// One selectable row: an album id with a display name.
 typedef _SourceAlbum = ({String id, String name});
+
+const _systemKindOrder = [
+  'new',
+  'review_later',
+  'one_star',
+  'two_star',
+  'three_star',
+];
 
 class _SortSourceSheet extends ConsumerStatefulWidget {
   const _SortSourceSheet();
@@ -47,18 +54,23 @@ class _SortSourceSheetState extends ConsumerState<_SortSourceSheet> {
       _error = null;
     });
     try {
-      final storage = ref.read(secureStorageRepositoryProvider);
+      final allAlbums =
+          await ref.read(apiServiceProvider).albumsApi.getAllAlbums() ?? [];
 
-      // System albums (New, Review Later, ⭐, ⭐⭐, ⭐⭐⭐) keep enum order.
-      final system = <_SourceAlbum>[];
-      for (final album in SwimmichSystemAlbum.values) {
-        final id = await storage.read(album.storageKey);
-        if (id != null) system.add((id: id, name: album.albumName));
-      }
+      // System albums in canonical kind order.
+      final byKind = {
+        for (final a in allAlbums.where((a) => a.systemKind != null))
+          a.systemKind!: (id: a.id, name: a.albumName),
+      };
+      final system = <_SourceAlbum>[
+        for (final kind in _systemKindOrder)
+          if (byKind.containsKey(kind)) byKind[kind]!,
+      ];
       final systemIds = system.map((e) => e.id).toSet();
 
       // User albums (everything that isn't a system album), sorted by name.
-      final all = await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      final all =
+          await ref.read(albumApiRepositoryProvider).getAll(shared: null);
       final user = all
           .where((a) => a.remoteId != null && !systemIds.contains(a.remoteId))
           .map<_SourceAlbum>((a) => (id: a.remoteId!, name: a.name))
@@ -187,7 +199,10 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.5),
               letterSpacing: 0.8,
             ),
       ),

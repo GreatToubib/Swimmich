@@ -3,8 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
-import 'package:immich_mobile/repositories/secure_storage.repository.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 
@@ -74,11 +72,16 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   /// (e.g. before async defaults have resolved).
   Future<List<String>> _albumIds() async {
     final selected = ref.read(sortSourceAlbumsProvider);
-    final storage = ref.read(secureStorageRepositoryProvider);
-    final newId =
-        await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
-    final rlId =
-        await storage.read(SwimmichSystemAlbum.reviewLater.storageKey);
+    final allAlbums =
+        await ref.read(apiServiceProvider).albumsApi.getAllAlbums();
+
+    String? kindId(String kind) => allAlbums
+        ?.where((a) => a.systemKind == kind)
+        .map((a) => a.id)
+        .firstOrNull;
+
+    final newId = kindId('new');
+    final rlId = kindId('review_later');
 
     if (selected.isEmpty) {
       return [if (newId != null) newId, if (rlId != null) rlId];
@@ -96,7 +99,7 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   Future<SortQueueState> _initLoad() async {
     final albumIds = await _albumIds();
     if (albumIds.isEmpty) {
-      _log.warning('No source album ids found — bootstrap may not have run yet');
+      _log.warning('No source album ids found — system albums may not be provisioned yet');
       return const SortQueueState(assets: [], hasMore: false);
     }
     for (final id in albumIds) {

@@ -21,7 +21,6 @@ import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
-import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
@@ -344,13 +343,16 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       if (widget.asset.id != assetId) return;
 
       final memberIds = albums.map((a) => a.id).toSet();
-      final storage = ref.read(secureStorageRepositoryProvider);
-      final oneId = await storage.read(SwimmichSystemAlbum.oneStar.storageKey);
-      final twoId = await storage.read(SwimmichSystemAlbum.twoStar.storageKey);
-      final threeId =
-          await storage.read(SwimmichSystemAlbum.threeStar.storageKey);
-      final newId =
-          await storage.read(SwimmichSystemAlbum.newAssets.storageKey);
+
+      String? idForKind(String kind) => albums
+          .where((a) => a.systemKind == kind)
+          .map((a) => a.id)
+          .firstOrNull;
+
+      final oneId = idForKind('one_star');
+      final twoId = idForKind('two_star');
+      final threeId = idForKind('three_star');
+      final newId = idForKind('new');
 
       int rating = 0;
       if (threeId != null && memberIds.contains(threeId)) {

@@ -26,7 +26,6 @@ import 'package:immich_mobile/theme/color_scheme.dart';
 import 'package:immich_mobile/theme/theme_data.dart';
 import 'package:immich_mobile/widgets/common/immich_logo.dart';
 import 'package:immich_mobile/widgets/common/immich_title_text.dart';
-import 'package:immich_mobile/widgets/swimmich/swimmich_bootstrap_dialog.dart';
 import 'package:logging/logging.dart';
 import 'package:url_launcher/url_launcher.dart' show launchUrl, LaunchMode;
 
@@ -410,7 +409,6 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
         }
       }
 
-      if (context.mounted) await runSwimmichBootstrap(context, ref);
       if (!context.mounted) return;
       unawaited(context.replaceRoute(Store.isBetaTimelineEnabled ? const TabShellRoute() : const TabControllerRoute()));
     }
