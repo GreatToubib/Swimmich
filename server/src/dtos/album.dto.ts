@@ -190,6 +190,9 @@ export class AlbumResponseDto {
   @ApiPropertyOptional({ description: undefined })
   @Type(() => ContributorCountResponseDto)
   contributorCounts?: ContributorCountResponseDto[];
+
+  @ApiPropertyOptional({ description: 'Swimmich system album kind' })
+  systemKind?: string | null;
 }
 
 export type MapAlbumDto = {
@@ -206,6 +209,7 @@ export type MapAlbumDto = {
   owner: ShallowDehydrateObject<User>;
   isActivityEnabled: boolean;
   order: AssetOrder;
+  systemKind?: string | null;
 };
 
 export const mapAlbum = (
@@ -257,6 +261,7 @@ export const mapAlbum = (
     assetCount: entity.assets?.length || 0,
     isActivityEnabled: entity.isActivityEnabled,
     order: entity.order,
+    systemKind: entity.systemKind ?? null,
   };
 };
 

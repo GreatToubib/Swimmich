@@ -1,17 +1,12 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/repositories/secure_storage.repository.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 
-/// Remote IDs of all Swimmich system albums, loaded from secure storage.
-///
-/// Used by album pickers to filter system albums regardless of their display
-/// name (e.g. emoji star albums that don't start with '_').
+/// Remote IDs of all Swimmich system albums, derived from the server's
+/// systemKind field so identity is stable even after renaming.
 final systemAlbumIdsProvider = FutureProvider<Set<String>>((ref) async {
-  final storage = ref.watch(secureStorageRepositoryProvider);
-  final ids = <String>{};
-  for (final album in SwimmichSystemAlbum.values) {
-    final id = await storage.read(album.storageKey);
-    if (id != null) ids.add(id);
-  }
-  return ids;
+  final albums = await ref.watch(apiServiceProvider).albumsApi.getAllAlbums();
+  return (albums ?? [])
+      .where((a) => a.systemKind != null)
+      .map((a) => a.id)
+      .toSet();
 });

@@ -62,4 +62,7 @@ export class AlbumTable {
 
   @UpdateIdColumn({ index: true })
   updateId!: Generated<string>;
+
+  @Column({ type: 'text', nullable: true })
+  systemKind!: string | null;
 }

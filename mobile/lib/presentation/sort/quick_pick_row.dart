@@ -303,8 +303,7 @@ class _PinPickerSheet extends StatelessWidget {
   final String? currentId;
 
   List<RemoteAlbum> get _filtered =>
-      albums.where((a) => !a.name.startsWith('_')).toList()
-        ..sort((a, b) => a.name.compareTo(b.name));
+      [...albums]..sort((a, b) => a.name.compareTo(b.name));
 
   @override
   Widget build(BuildContext context) {
