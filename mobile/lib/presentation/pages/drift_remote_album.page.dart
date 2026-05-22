@@ -20,7 +20,7 @@ import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/remote_album_sliver_app_bar.dart';
-import 'package:openapi/api.dart';
+import 'package:openapi/api.dart' as openapi;
 
 @RoutePage()
 class RemoteAlbumPage extends ConsumerStatefulWidget {
@@ -146,7 +146,7 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
         unawaited(context.pushRoute(const DriftAlbumsRoute()));
       } catch (e) {
         String msg = 'album_viewer_appbar_share_err_delete'.t(context: context);
-        if (e is ApiException && e.code == 403) {
+        if (e is openapi.ApiException && e.code == 403) {
           try {
             final body = jsonDecode(e.message ?? '{}') as Map<String, dynamic>;
             final serverMsg = body['message'];
