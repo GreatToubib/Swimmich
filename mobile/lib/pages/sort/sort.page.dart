@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
-import 'package:immich_mobile/pages/sort/sort_source_sheet.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
 import 'package:immich_mobile/presentation/sort/star_rating_bar.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
@@ -16,14 +15,11 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
-import 'package:immich_mobile/providers/sort_source_filter.provider.dart';
-import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:immich_mobile/widgets/common/immich_app_bar.dart';
 import 'package:openapi/api.dart';
 
@@ -78,46 +74,47 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    // On first mount: load album names and prune deleted quick-pick chips.
+    // On first mount: load album names, prune deleted quick-pick chips, and
+    // reload the deck from the server.
     useEffect(() {
       unawaited(_refreshAlbumsAndPrune(ref));
+      unawaited(ref.read(sortQueueProvider.notifier).refresh());
       return null;
     }, const []);
 
     // The Sort tab is kept alive by AutoTabsRouter, so this page does not
     // remount when re-opened. Re-run the refresh+prune each time the Sort tab
-    // becomes active, to catch albums deleted on the server in the meantime.
+    // becomes active, to catch albums deleted on the server in the meantime,
+    // and reload the deck when the user is caught up (never mid-sort).
     ref.listen<TabEnum>(tabProvider, (prev, next) {
       if (next == TabEnum.sort && prev != TabEnum.sort) {
         unawaited(_refreshAlbumsAndPrune(ref));
+        final q = ref.read(sortQueueProvider).valueOrNull;
+        if (q == null || q.current == null) {
+          unawaited(ref.read(sortQueueProvider.notifier).refresh());
+        }
       }
     });
 
     return Scaffold(
-      appBar: const ImmichAppBar(
-        showUploadButton: false,
-        actions: [_SourceButton()],
-      ),
+      appBar: const ImmichAppBar(),
       backgroundColor: Colors.black,
       body: queueAsync.when(
         loading: () => const _LoadingView(),
         error: (e, _) =>
             _ErrorView(error: e.toString(), onRetry: notifier.refresh),
         data: (queue) => queue.current == null
-            ? _AllCaughtUpView(
-                onRefresh: () async {
-                  await ref
-                      .read(swimmichBootstrapServiceProvider)
-                      .checkForNewAssets();
-                  await notifier.refresh();
-                },
-              )
+            // A batch is still loading — keep the spinner so the lazy paging is
+            // invisible; only show "all caught up" once truly exhausted.
+            ? (queue.hasMore
+                ? const _LoadingView()
+                : _AllCaughtUpView(onRefresh: notifier.refresh))
             : Column(
                 children: [
                   Expanded(
                     child: _SortDeckView(
                       asset: queue.current!,
-                      remaining: queue.remaining,
+                      remaining: queue.leftToSort,
                       nextAsset: queue.nextAsset,
                     ),
                   ),
@@ -257,14 +254,18 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// True while a fly-off or bounce-back animation is playing.
   bool _isAnimating = false;
 
-  /// Star rating selected by the user for the current card (0 = none, 1–3).
+  /// Star rating selected by the user for the current card (0 = none, 1–5).
   int _starRating = 0;
 
-  /// The asset's membership when the card opened (edit mode), used to compute
-  /// what to remove when the user de-selects albums / changes the rating.
+  /// Whether the current card is marked favourite (heart toggle).
+  bool _isFavorite = false;
+
+  /// The asset's state when the card opened (edit mode), used to compute what
+  /// to revert on undo and which albums to remove when de-selected.
   Set<String> _originalUserAlbumIds = const {};
   int _originalStarRating = 0;
-  bool _wasInNew = false;
+  bool _originalFavorite = false;
+  SortStatus _originalSortStatus = SortStatus.new_;
 
   /// Prevents the haptic from firing on every frame at threshold.
   bool _hapticFired = false;
@@ -317,65 +318,38 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// membership. Deferred to a microtask so provider writes happen outside the
   /// build phase.
   void _resetAndPrefill() {
-    final assetId = widget.asset.id;
+    final asset = widget.asset;
+    // Native fields are already on the asset DTO — seed the UI synchronously.
+    final rating = asset.exifInfo?.rating?.toInt() ?? 0;
+    _originalStarRating = rating;
+    _originalFavorite = asset.isFavorite;
+    _originalSortStatus = asset.sortStatus;
     _originalUserAlbumIds = const {};
-    _originalStarRating = 0;
-    _wasInNew = false;
-    Future.microtask(() async {
-      if (!mounted) return;
-      setState(() => _starRating = 0);
+    Future.microtask(() {
+      if (!mounted || widget.asset.id != asset.id) return;
+      setState(() {
+        _starRating = rating;
+        _isFavorite = asset.isFavorite;
+      });
       ref.read(quickPickProvider.notifier).clearSelection();
-      await _prefillFromMembership(assetId);
+      unawaited(_prefillAlbums(asset.id));
     });
   }
 
-  /// Looks up which albums the asset is already in and pre-selects the matching
-  /// quick-pick albums and star rating, so an already-sorted card opens with
-  /// its current state shown.
-  Future<void> _prefillFromMembership(String assetId) async {
+  /// Looks up which user albums the asset is already in and pre-selects the
+  /// matching quick-pick chips, so an already-curated card opens with its
+  /// current album membership shown.
+  Future<void> _prefillAlbums(String assetId) async {
     try {
       final albums = await ref
           .read(apiServiceProvider)
           .albumsApi
           .getAllAlbums(assetId: assetId);
-      if (albums == null || !mounted) return;
-      // Guard against the card having advanced while we were fetching.
-      if (widget.asset.id != assetId) return;
+      if (albums == null || !mounted || widget.asset.id != assetId) return;
 
       final memberIds = albums.map((a) => a.id).toSet();
-
-      String? idForKind(String kind) => albums
-          .where((a) => a.systemKind == kind)
-          .map((a) => a.id)
-          .firstOrNull;
-
-      final oneId = idForKind('one_star');
-      final twoId = idForKind('two_star');
-      final threeId = idForKind('three_star');
-      final newId = idForKind('new');
-
-      int rating = 0;
-      if (threeId != null && memberIds.contains(threeId)) {
-        rating = 3;
-      } else if (twoId != null && memberIds.contains(twoId)) {
-        rating = 2;
-      } else if (oneId != null && memberIds.contains(oneId)) {
-        rating = 1;
-      }
-
-      // Pre-select only non-system albums as quick-pick chips.
-      final systemIds = await ref.read(systemAlbumIdsProvider.future);
-      final userMembers =
-          memberIds.where((id) => !systemIds.contains(id)).toSet();
-
-      if (!mounted || widget.asset.id != assetId) return;
-      // Remember the opening state so a sort can reconcile (remove de-selected
-      // albums / clear an old star rating).
-      _originalUserAlbumIds = userMembers;
-      _originalStarRating = rating;
-      _wasInNew = newId != null && memberIds.contains(newId);
-      ref.read(quickPickProvider.notifier).setSelection(userMembers);
-      setState(() => _starRating = rating);
+      _originalUserAlbumIds = memberIds;
+      ref.read(quickPickProvider.notifier).setSelection(memberIds);
     } catch (_) {
       // Membership lookup is best-effort; ignore failures.
     }
@@ -446,20 +420,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       _bounceBack();
       return;
     }
-    if (action == SortAction.sorted &&
-        ref.read(quickPickProvider).selected.isEmpty &&
-        _starRating == 0) {
-      _bounceBack();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Select an album or star rating first'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
+    // Keeping is always allowed — rating, favourite and album are all optional.
     _commitAction(action);
   }
 
@@ -509,9 +470,11 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     final assetId = widget.asset.id;
     final qpIds = ref.read(quickPickProvider).selected.toList();
     final starRating = _starRating;
+    final favorite = _isFavorite;
     final previousQpIds = _originalUserAlbumIds.toList();
     final previousStar = _originalStarRating;
-    final wasInNew = _wasInNew;
+    final previousFavorite = _originalFavorite;
+    final previousSortStatus = _originalSortStatus;
 
     // Reset drag state. The rating/selection for the next card are reset and
     // re-filled by didUpdateWidget → _resetAndPrefill once it slides in.
@@ -530,7 +493,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       previousQuickPickIds: previousQpIds,
       starRating: starRating,
       previousStarRating: previousStar,
-      wasInNew: wasInNew,
+      favorite: favorite,
+      previousFavorite: previousFavorite,
+      previousSortStatus: previousSortStatus,
     );
     ref.read(undoStackProvider.notifier).push(record);
 
@@ -551,6 +516,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             previousQuickPickAlbumIds:
                 action == SortAction.sorted ? previousQpIds : const [],
             starRating: action == SortAction.sorted ? starRating : null,
+            favorite: action == SortAction.sorted ? favorite : false,
           );
       if (action == SortAction.sorted && mounted) {
         ref.read(quickPickProvider.notifier).recordUsage(qpIds);
@@ -683,9 +649,31 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           child: _CountChip(remaining: widget.remaining),
         ),
 
+        // Video indicator — centred play icon shown while the card is at rest.
+        if (widget.asset.type == AssetTypeEnum.VIDEO && _drag.distance < 15)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: Center(
+                child: Icon(
+                  Icons.play_circle_outline_rounded,
+                  color: Colors.white70,
+                  size: 72,
+                ),
+              ),
+            ),
+          ),
+
+        // Favourite heart — bottom left.
+        Positioned(
+          left: 12,
+          bottom: 12,
+          child: _FavoriteHeart(
+            isFavorite: _isFavorite,
+            onChanged: (v) => setState(() => _isFavorite = v),
+          ),
+        ),
+
         // Star rating bar — bottom right.
-        // EDIT MODE: in a future edit-mode flow, pre-populate _starRating from
-        // the asset's existing star album membership before displaying this card.
         Positioned(
           right: 12,
           bottom: 12,
@@ -747,24 +735,29 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   }
 }
 
-// ─── Source button (app-bar header) ──────────────────────────────────────────
+// ─── Favourite heart toggle ───────────────────────────────────────────────────
 
-/// Compact icon button shown in the Sort page header, between the Immich logo
-/// and the profile button. Opens the source-album selection sheet; a small
-/// badge shows how many source albums are currently selected.
-class _SourceButton extends ConsumerWidget {
-  const _SourceButton();
+class _FavoriteHeart extends StatelessWidget {
+  const _FavoriteHeart({required this.isFavorite, required this.onChanged});
+
+  final bool isFavorite;
+  final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final count = ref.watch(sortSourceAlbumsProvider).length;
-    return IconButton(
-      tooltip: 'Albums to sort',
-      onPressed: () => showSortSourceSheet(context, ref),
-      icon: Badge(
-        isLabelVisible: count > 0,
-        label: Text('$count'),
-        child: const Icon(Icons.filter_list),
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!isFavorite),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: const BoxDecoration(
+          color: Colors.black54,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          size: 26,
+          color: isFavorite ? Colors.redAccent : Colors.white,
+        ),
       ),
     );
   }

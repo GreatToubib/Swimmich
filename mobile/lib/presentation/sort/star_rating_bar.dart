@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Four-icon rating bar shown on the bottom-right of each sort card.
+/// Six-icon rating bar shown on the bottom-right of each sort card.
 ///
-/// Icons: Meh (no rating) | 1★ | 2★ | 3★
+/// Icons: Meh (no rating) | 1★ | 2★ | 3★ | 4★ | 5★
 /// Tapping Meh resets to 0; tapping star N sets rating to N.
 /// Stars ≤ rating are filled; stars > rating show only a border.
-/// A non-zero rating counts as an album selection — the card can be
-/// swiped right without a quick-pick chip also being selected.
+/// The rating is written to the asset's native metadata (xmp:Rating).
 class StarRatingBar extends StatelessWidget {
   const StarRatingBar({
     super.key,
@@ -14,7 +13,7 @@ class StarRatingBar extends StatelessWidget {
     required this.onChanged,
   });
 
-  final int rating; // 0 = none, 1–3 = star count
+  final int rating; // 0 = none, 1–5 = star count
   final ValueChanged<int> onChanged;
 
   @override
@@ -41,8 +40,8 @@ class StarRatingBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          // Stars 1–3.
-          for (int i = 1; i <= 3; i++) ...[
+          // Stars 1–5.
+          for (int i = 1; i <= 5; i++) ...[
             GestureDetector(
               onTap: () => onChanged(i),
               child: Icon(
@@ -51,7 +50,7 @@ class StarRatingBar extends StatelessWidget {
                 color: i <= rating ? Colors.amber : onSurface.withValues(alpha: 0.5),
               ),
             ),
-            if (i < 3) const SizedBox(width: 2),
+            if (i < 5) const SizedBox(width: 2),
           ],
         ],
       ),

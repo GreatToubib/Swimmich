@@ -6,7 +6,6 @@ import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
-import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 
@@ -42,7 +41,6 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   bool _isSorting = false;
 
   List<Album>? _allAlbums;
-  Set<String> _systemAlbumIds = {};
   bool _loading = true;
   String? _loadError;
 
@@ -66,14 +64,10 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
       _loadError = null;
     });
     try {
-      final results = await Future.wait([
-        ref.read(albumApiRepositoryProvider).getAll(shared: null),
-        ref.read(systemAlbumIdsProvider.future),
-      ]);
+      final albums = await ref.read(albumApiRepositoryProvider).getAll(shared: null);
       if (mounted) {
         setState(() {
-          _allAlbums = results[0] as List<Album>;
-          _systemAlbumIds = results[1] as Set<String>;
+          _allAlbums = albums;
           _loading = false;
         });
       }
@@ -90,9 +84,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   List<Album> get _filtered {
     final all = _allAlbums ?? [];
     return all
-        .where((a) =>
-            a.remoteId != null &&
-            !_systemAlbumIds.contains(a.remoteId))
+        .where((a) => a.remoteId != null)
         .where((a) => a.name.toLowerCase().contains(_filter.toLowerCase()))
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));

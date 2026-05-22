@@ -3,7 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
-import 'package:immich_mobile/providers/system_album_ids.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 
 /// Settings widget for configuring the 3 pinned quick-pick album slots.
@@ -113,17 +112,11 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
   Future<void> _load() async {
     try {
-      final results = await Future.wait([
-        ref.read(albumApiRepositoryProvider).getAll(shared: null),
-        ref.read(systemAlbumIdsProvider.future),
-      ]);
-      final all = results[0] as List<Album>;
-      final systemIds = results[1] as Set<String>;
+      final all = await ref.read(albumApiRepositoryProvider).getAll(shared: null);
       if (mounted) {
         setState(() {
           _albums = all
-              .where((a) =>
-                  a.remoteId != null && !systemIds.contains(a.remoteId))
+              .where((a) => a.remoteId != null)
               .toList()
             ..sort((a, b) => a.name.compareTo(b.name));
           _loading = false;

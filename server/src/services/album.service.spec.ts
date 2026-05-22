@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { BulkIdErrorReason } from 'src/dtos/asset-ids.response.dto';
 import { AlbumUserRole, AssetOrder, UserMetadataKey } from 'src/enum';
 import { AlbumService } from 'src/services/album.service';
@@ -374,16 +374,6 @@ describe(AlbumService.name, () => {
 
       expect(mocks.album.delete).toHaveBeenCalledTimes(1);
       expect(mocks.album.delete).toHaveBeenCalledWith(album.id);
-    });
-
-    it('should throw ForbiddenException when deleting a system album', async () => {
-      const album = AlbumFactory.create({ systemKind: 'new' });
-      mocks.access.album.checkOwnerAccess.mockResolvedValue(new Set([album.id]));
-      mocks.album.getById.mockResolvedValue(getForAlbum(album));
-
-      await expect(sut.delete(AuthFactory.create(album.owner), album.id)).rejects.toBeInstanceOf(ForbiddenException);
-
-      expect(mocks.album.delete).not.toHaveBeenCalled();
     });
   });
 

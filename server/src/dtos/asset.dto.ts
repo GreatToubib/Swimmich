@@ -18,7 +18,7 @@ import {
 } from 'class-validator';
 import { HistoryBuilder, Property } from 'src/decorators';
 import { BulkIdsDto } from 'src/dtos/asset-ids.response.dto';
-import { AssetType, AssetVisibility } from 'src/enum';
+import { AssetType, AssetVisibility, SortStatus } from 'src/enum';
 import { AssetStats } from 'src/repositories/asset.repository';
 import { IsNotSiblingOf, Optional, ValidateBoolean, ValidateEnum, ValidateString, ValidateUUID } from 'src/validation';
 
@@ -75,6 +75,9 @@ export class UpdateAssetBase {
   @Optional()
   @IsString()
   description?: string;
+
+  @ValidateEnum({ enum: SortStatus, name: 'SortStatus', optional: true, description: 'Swimmich sort/triage status' })
+  sortStatus?: SortStatus;
 }
 
 export class AssetBulkUpdateDto extends UpdateAssetBase {

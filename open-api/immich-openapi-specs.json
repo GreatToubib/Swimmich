@@ -9502,6 +9502,15 @@
             }
           },
           {
+            "name": "sortStatus",
+            "required": false,
+            "in": "query",
+            "description": "Filter by Swimmich sort status",
+            "schema": {
+              "$ref": "#/components/schemas/SortStatus"
+            }
+          },
+          {
             "name": "state",
             "required": false,
             "in": "query",
@@ -15699,11 +15708,6 @@
             "format": "date-time",
             "type": "string"
           },
-          "systemKind": {
-            "description": "Swimmich system album kind",
-            "nullable": true,
-            "type": "string"
-          },
           "updatedAt": {
             "description": "Last update date",
             "format": "date-time",
@@ -15979,6 +15983,14 @@
               }
             ],
             "x-immich-state": "Stable"
+          },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Swimmich sort/triage status"
           },
           "timeZone": {
             "description": "Time zone (IANA timezone)",
@@ -17158,6 +17170,14 @@
             ],
             "x-immich-state": "Deprecated"
           },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Swimmich sort/triage status"
+          },
           "stack": {
             "allOf": [
               {
@@ -17231,6 +17251,7 @@
           "originalFileName",
           "originalPath",
           "ownerId",
+          "sortStatus",
           "thumbhash",
           "type",
           "updatedAt",
@@ -19184,6 +19205,14 @@
             "minimum": 1,
             "type": "number"
           },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Filter by Swimmich sort status"
+          },
           "state": {
             "description": "Filter by state/province name",
             "nullable": true,
@@ -20927,6 +20956,14 @@
             "minimum": 1,
             "type": "number"
           },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Filter by Swimmich sort status"
+          },
           "state": {
             "description": "Filter by state/province name",
             "nullable": true,
@@ -22318,6 +22355,14 @@
             "minimum": 1,
             "type": "number"
           },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Filter by Swimmich sort status"
+          },
           "state": {
             "description": "Filter by state/province name",
             "nullable": true,
@@ -22388,6 +22433,15 @@
           }
         },
         "type": "object"
+      },
+      "SortStatus": {
+        "description": "Swimmich sort/triage status",
+        "enum": [
+          "new",
+          "review_later",
+          "kept"
+        ],
+        "type": "string"
       },
       "SourceType": {
         "description": "Face detection source type",
@@ -22562,6 +22616,14 @@
               }
             ],
             "x-immich-state": "Stable"
+          },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Filter by Swimmich sort status"
           },
           "state": {
             "description": "Filter by state/province name",
@@ -25466,6 +25528,14 @@
               }
             ],
             "x-immich-state": "Stable"
+          },
+          "sortStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SortStatus"
+              }
+            ],
+            "description": "Swimmich sort/triage status"
           },
           "visibility": {
             "allOf": [

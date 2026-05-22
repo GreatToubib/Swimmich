@@ -16,7 +16,9 @@ class UndoRecord {
     this.previousQuickPickIds = const [],
     this.starRating = 0,
     this.previousStarRating = 0,
-    this.wasInNew = false,
+    this.favorite = false,
+    this.previousFavorite = false,
+    this.previousSortStatus = SortStatus.new_,
   });
 
   final AssetResponseDto asset;
@@ -28,41 +30,39 @@ class UndoRecord {
   /// Quick-pick (user) albums the asset was in BEFORE the sort (edit mode).
   final List<String> previousQuickPickIds;
 
-  /// Star rating applied by this sort (0 = none, 1–3).
+  /// Star rating applied by this sort (0 = none, 1–5).
   final int starRating;
 
-  /// Star rating the asset had before this sort (edit mode).
+  /// Star rating the asset had before this sort.
   final int previousStarRating;
 
-  /// Whether the asset was in the _New album before sorting (so undo knows
-  /// whether to put it back there).
-  final bool wasInNew;
+  /// Favourite flag applied by this sort.
+  final bool favorite;
+
+  /// Favourite flag the asset had before this sort.
+  final bool previousFavorite;
+
+  /// The asset's triage status before this sort, so undo can restore it.
+  final SortStatus previousSortStatus;
 }
 
-/// Executes the three sort-deck actions against the Immich API.
-///
-/// Album add/remove are mirrored into the local Drift DB so the Albums view
-/// reflects changes without a full re-sync.
+/// Executes the three sort-deck actions against native Immich asset fields:
+/// `sortStatus` (triage), `rating` (1–5 stars), `isFavorite`, plus optional
+/// membership in user-curated albums. No system/proxy albums are involved.
 class SortActionService {
   const SortActionService(
     this._assetRepo,
     this._albumRepo,
-    this._albumsApi,
     this._driftAlbumRepo,
   );
 
   final AssetApiRepository _assetRepo;
   final AlbumApiRepository _albumRepo;
-  final AlbumsApi _albumsApi;
   final DriftRemoteAlbumRepository _driftAlbumRepo;
 
-  String? _kindId(List<AlbumResponseDto>? albums, String kind) =>
-      albums?.where((a) => a.systemKind == kind).map((a) => a.id).firstOrNull;
-
-  /// Adds an asset to an album on the server, then mirrors the change into the
-  /// local Drift DB so the Albums view reflects it without a full re-sync.
-  /// The local mirror is best-effort: a failure (e.g. album/asset not yet in
-  /// the local cache) must never fail the authoritative server operation.
+  /// Adds an asset to a user album on the server, then mirrors the change into
+  /// the local Drift DB so the Albums view reflects it without a full re-sync.
+  /// The local mirror is best-effort and must never fail the server operation.
   Future<void> _albumAdd(String albumId, String assetId) async {
     await _albumRepo.addAssets(albumId, [assetId]);
     try {
@@ -81,30 +81,19 @@ class SortActionService {
     }
   }
 
-  /// Reconciles the asset's star-album membership to exactly [rating]:
-  /// it ends up in only the matching star album (or none for 0), and its
-  /// favorite flag tracks whether it has any stars. Star albums are exclusive
-  /// — a 3★ photo lives in ⭐⭐⭐ only, not also in ⭐ and ⭐⭐.
-  Future<void> _applyStarRating(
-    List<AlbumResponseDto>? albums,
+  /// Reconciles the asset's user-album membership to exactly [target]:
+  /// adds the newly selected albums and removes any that were de-selected.
+  Future<void> _reconcileAlbums(
     String assetId,
-    int rating,
+    Set<String> target,
+    Set<String> previous,
   ) async {
-    final byRating = <int, String?>{
-      1: _kindId(albums, 'one_star'),
-      2: _kindId(albums, 'two_star'),
-      3: _kindId(albums, 'three_star'),
-    };
-    for (final entry in byRating.entries) {
-      final albumId = entry.value;
-      if (albumId == null) continue;
-      if (entry.key == rating) {
-        await _albumAdd(albumId, assetId);
-      } else {
-        await _albumRemove(albumId, assetId);
-      }
+    for (final id in target) {
+      await _albumAdd(id, assetId);
     }
-    await _assetRepo.updateFavorite([assetId], rating > 0);
+    for (final id in previous.difference(target)) {
+      await _albumRemove(id, assetId);
+    }
   }
 
   Future<void> execute(
@@ -113,91 +102,56 @@ class SortActionService {
     List<String> quickPickAlbumIds = const [],
     List<String> previousQuickPickAlbumIds = const [],
     int? starRating,
+    bool favorite = false,
   }) async {
-    final allAlbums = await _albumsApi.getAllAlbums();
-    final newId = _kindId(allAlbums, 'new');
-
     switch (action) {
       case SortAction.delete:
         // Soft-delete (trash); force: false keeps it recoverable.
         await _assetRepo.delete([assetId], false);
-        final rlIdDel = _kindId(allAlbums, 'review_later');
-        if (rlIdDel != null) await _albumRemove(rlIdDel, assetId);
-        if (newId != null) await _albumRemove(newId, assetId);
 
       case SortAction.reviewLater:
-        final id = _kindId(allAlbums, 'review_later');
-        if (id != null) await _albumAdd(id, assetId);
-        if (newId != null) await _albumRemove(newId, assetId);
+        await _assetRepo.setSortStatus(assetId, SortStatus.reviewLater);
 
       case SortAction.sorted:
-        // Remove from the review-later source album (photo may have come from
-        // there).
-        final rlIdSorted = _kindId(allAlbums, 'review_later');
-        if (rlIdSorted != null) {
-          await _albumRemove(rlIdSorted, assetId);
-        }
-
-        // Reconcile user (quick-pick) albums: add the selected ones, and in
-        // edit mode remove any the user de-selected, so the asset ends up in
-        // exactly the chosen albums.
-        final target = quickPickAlbumIds.toSet();
-        final previous = previousQuickPickAlbumIds.toSet();
-        for (final qId in target) {
-          await _albumAdd(qId, assetId);
-        }
-        for (final qId in previous.difference(target)) {
-          await _albumRemove(qId, assetId);
-        }
-
-        // Star albums (exclusive). Skipped entirely when [starRating] is null
-        // (e.g. the album-picker "Sort" button, which doesn't manage stars).
-        if (starRating != null) {
-          await _applyStarRating(allAlbums, assetId, starRating);
-        }
-
-        if (newId != null) await _albumRemove(newId, assetId);
+        // Keep: native triage status + rating + favourite, plus optional
+        // membership in user-curated albums. Any of these may be a no-op.
+        await _assetRepo.setSortStatus(
+          assetId,
+          SortStatus.kept,
+          rating: starRating,
+        );
+        await _assetRepo.updateFavorite([assetId], favorite);
+        await _reconcileAlbums(
+          assetId,
+          quickPickAlbumIds.toSet(),
+          previousQuickPickAlbumIds.toSet(),
+        );
     }
   }
 
   Future<void> undo(UndoRecord record) async {
-    final allAlbums = await _albumsApi.getAllAlbums();
-    final newId = _kindId(allAlbums, 'new');
     final assetId = record.asset.id;
 
     switch (record.action) {
       case SortAction.delete:
         await _assetRepo.restoreTrash([assetId]);
-        if (newId != null) {
-          await _albumAdd(newId, assetId);
-        }
 
       case SortAction.reviewLater:
-        final id = _kindId(allAlbums, 'review_later');
-        if (id != null) await _albumRemove(id, assetId);
-        if (newId != null) await _albumAdd(newId, assetId);
+        await _assetRepo.setSortStatus(assetId, record.previousSortStatus);
 
       case SortAction.sorted:
-        final target = record.quickPickIds.toSet();
-        final previous = record.previousQuickPickIds.toSet();
+        // Restore the previous triage status, rating and favourite.
+        await _assetRepo.setSortStatus(
+          assetId,
+          record.previousSortStatus,
+          rating: record.previousStarRating,
+        );
+        await _assetRepo.updateFavorite([assetId], record.previousFavorite);
         // Reverse the user-album changes: remove what we added, restore what
         // we removed.
-        for (final qId in target.difference(previous)) {
-          await _albumRemove(qId, assetId);
-        }
-        for (final qId in previous.difference(target)) {
-          await _albumAdd(qId, assetId);
-        }
-
-        // Restore the previous star rating if this sort changed it.
-        if (record.starRating != record.previousStarRating) {
-          await _applyStarRating(allAlbums, assetId, record.previousStarRating);
-        }
-
-        // Put it back in _New only if it came from there.
-        if (record.wasInNew && newId != null) {
-          await _albumAdd(newId, assetId);
-        }
+        final target = record.quickPickIds.toSet();
+        final previous = record.previousQuickPickIds.toSet();
+        await _reconcileAlbums(assetId, previous, target);
     }
   }
 }
@@ -206,7 +160,6 @@ final sortActionServiceProvider = Provider<SortActionService>(
   (ref) => SortActionService(
     ref.watch(assetApiRepositoryProvider),
     ref.watch(albumApiRepositoryProvider),
-    ref.watch(apiServiceProvider).albumsApi,
     ref.watch(remoteAlbumRepository),
   ),
 );

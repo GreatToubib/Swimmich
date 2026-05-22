@@ -20,6 +20,7 @@ class UpdateAssetDto {
     this.livePhotoVideoId,
     this.longitude,
     this.rating,
+    this.sortStatus,
     this.visibility,
   });
 
@@ -77,6 +78,15 @@ class UpdateAssetDto {
   /// Maximum value: 5
   num? rating;
 
+  /// Swimmich sort/triage status
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  SortStatus? sortStatus;
+
   /// Asset visibility
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -95,6 +105,7 @@ class UpdateAssetDto {
     other.livePhotoVideoId == livePhotoVideoId &&
     other.longitude == longitude &&
     other.rating == rating &&
+    other.sortStatus == sortStatus &&
     other.visibility == visibility;
 
   @override
@@ -107,10 +118,11 @@ class UpdateAssetDto {
     (livePhotoVideoId == null ? 0 : livePhotoVideoId!.hashCode) +
     (longitude == null ? 0 : longitude!.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (visibility == null ? 0 : visibility!.hashCode);
 
   @override
-  String toString() => 'UpdateAssetDto[dateTimeOriginal=$dateTimeOriginal, description=$description, isFavorite=$isFavorite, latitude=$latitude, livePhotoVideoId=$livePhotoVideoId, longitude=$longitude, rating=$rating, visibility=$visibility]';
+  String toString() => 'UpdateAssetDto[dateTimeOriginal=$dateTimeOriginal, description=$description, isFavorite=$isFavorite, latitude=$latitude, livePhotoVideoId=$livePhotoVideoId, longitude=$longitude, rating=$rating, sortStatus=$sortStatus, visibility=$visibility]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -149,6 +161,11 @@ class UpdateAssetDto {
     } else {
     //  json[r'rating'] = null;
     }
+    if (this.sortStatus != null) {
+      json[r'sortStatus'] = this.sortStatus;
+    } else {
+    //  json[r'sortStatus'] = null;
+    }
     if (this.visibility != null) {
       json[r'visibility'] = this.visibility;
     } else {
@@ -175,6 +192,7 @@ class UpdateAssetDto {
         rating: json[r'rating'] == null
             ? null
             : num.parse('${json[r'rating']}'),
+        sortStatus: SortStatus.fromJson(json[r'sortStatus']),
         visibility: AssetVisibility.fromJson(json[r'visibility']),
       );
     }

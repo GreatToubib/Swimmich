@@ -5,7 +5,7 @@ import { Place } from 'src/database';
 import { HistoryBuilder, Property } from 'src/decorators';
 import { AlbumResponseDto } from 'src/dtos/album.dto';
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
-import { AssetOrder, AssetType, AssetVisibility } from 'src/enum';
+import { AssetOrder, AssetType, AssetVisibility, SortStatus } from 'src/enum';
 import { Optional, ValidateBoolean, ValidateDate, ValidateEnum, ValidateString, ValidateUUID } from 'src/validation';
 
 class BaseSearchDto {
@@ -26,6 +26,9 @@ class BaseSearchDto {
 
   @ValidateBoolean({ optional: true, description: 'Filter by favorite status' })
   isFavorite?: boolean;
+
+  @ValidateEnum({ enum: SortStatus, name: 'SortStatus', optional: true, description: 'Filter by Swimmich sort status' })
+  sortStatus?: SortStatus;
 
   @ValidateBoolean({ optional: true, description: 'Filter by motion photo status' })
   isMotion?: boolean;

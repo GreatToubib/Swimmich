@@ -388,6 +388,7 @@ export function searchAssetBuilder(kysely: Kysely<DB>, options: AssetSearchBuild
     )
     .$if(!!options.type, (qb) => qb.where('asset.type', '=', options.type!))
     .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
+    .$if(options.sortStatus !== undefined, (qb) => qb.where('asset.sortStatus', '=', options.sortStatus!))
     .$if(options.isOffline !== undefined, (qb) => qb.where('asset.isOffline', '=', options.isOffline!))
     .$if(options.isEncoded !== undefined, (qb) =>
       qb.where((eb) => {
