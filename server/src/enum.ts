@@ -360,6 +360,12 @@ export enum AssetStatus {
   Deleted = 'deleted',
 }
 
+export enum SortStatus {
+  New = 'new',
+  ReviewLater = 'review_later',
+  Kept = 'kept',
+}
+
 export enum SourceType {
   MachineLearning = 'machine-learning',
   Exif = 'exif',

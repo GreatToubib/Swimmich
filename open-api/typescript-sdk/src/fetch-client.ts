@@ -615,6 +615,8 @@ export type AssetResponseDto = {
     people?: PersonWithFacesResponseDto[];
     /** Is resized */
     resized?: boolean;
+    /** Swimmich sort/triage status */
+    sortStatus: SortStatus;
     stack?: (AssetStackResponseDto) | null;
     tags?: TagResponseDto[];
     /** Thumbhash for thumbnail generation (base64) also used as the c query param for thumbnail cache busting. */
@@ -838,6 +840,8 @@ export type AssetBulkUpdateDto = {
     longitude?: number;
     /** Rating in range [1-5], or null for unrated */
     rating?: number | null;
+    /** Swimmich sort/triage status */
+    sortStatus?: SortStatus;
     /** Time zone (IANA timezone) */
     timeZone?: string;
     /** Asset visibility */
@@ -948,6 +952,8 @@ export type UpdateAssetDto = {
     longitude?: number;
     /** Rating in range [1-5], or null for unrated */
     rating?: number | null;
+    /** Swimmich sort/triage status */
+    sortStatus?: SortStatus;
     /** Asset visibility */
     visibility?: AssetVisibility;
 };
@@ -1730,6 +1736,8 @@ export type MetadataSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Filter by Swimmich sort status */
+    sortStatus?: SortStatus;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -1846,6 +1854,8 @@ export type RandomSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Filter by Swimmich sort status */
+    sortStatus?: SortStatus;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -1922,6 +1932,8 @@ export type SmartSearchDto = {
     rating?: number | null;
     /** Number of results to return */
     size?: number;
+    /** Filter by Swimmich sort status */
+    sortStatus?: SortStatus;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -1986,6 +1998,8 @@ export type StatisticsSearchDto = {
     personIds?: string[];
     /** Filter by rating [1-5], or null for unrated */
     rating?: number | null;
+    /** Filter by Swimmich sort status */
+    sortStatus?: SortStatus;
     /** Filter by state/province name */
     state?: string | null;
     /** Filter by tag IDs */
@@ -5465,7 +5479,7 @@ export function getExploreData(opts?: Oazapfts.RequestOpts) {
 /**
  * Search large assets
  */
-export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, deviceId, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif }: {
+export function searchLargeAssets({ albumIds, city, country, createdAfter, createdBefore, deviceId, isEncoded, isFavorite, isMotion, isNotInAlbum, isOffline, lensModel, libraryId, make, minFileSize, model, ocr, personIds, rating, size, sortStatus, state, tagIds, takenAfter, takenBefore, trashedAfter, trashedBefore, $type, updatedAfter, updatedBefore, visibility, withDeleted, withExif }: {
     albumIds?: string[];
     city?: string | null;
     country?: string | null;
@@ -5486,6 +5500,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
     personIds?: string[];
     rating?: number | null;
     size?: number;
+    sortStatus?: SortStatus;
     state?: string | null;
     tagIds?: string[] | null;
     takenAfter?: string;
@@ -5523,6 +5538,7 @@ export function searchLargeAssets({ albumIds, city, country, createdAfter, creat
         personIds,
         rating,
         size,
+        sortStatus,
         state,
         tagIds,
         takenAfter,
@@ -6912,6 +6928,11 @@ export enum SourceType {
     MachineLearning = "machine-learning",
     Exif = "exif",
     Manual = "manual"
+}
+export enum SortStatus {
+    New = "new",
+    ReviewLater = "review_later",
+    Kept = "kept"
 }
 export enum AssetTypeEnum {
     Image = "IMAGE",

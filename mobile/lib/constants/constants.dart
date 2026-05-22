@@ -56,10 +56,11 @@ const String kImmichAppStoreLink = "https://apps.apple.com/app/immich/id16139456
 const String kImmichPlayStoreLink = "https://play.google.com/store/apps/details?id=app.alextran.immich";
 const String kImmichLatestRelease = "https://github.com/immich-app/immich/releases/latest";
 
-const int kPhotoTabIndex = 0;
-const int kSearchTabIndex = 1;
-const int kAlbumTabIndex = 2;
-const int kLibraryTabIndex = 3;
+const int kSortTabIndex = 0;
+const int kPhotoTabIndex = 1;
+const int kSearchTabIndex = 2;
+const int kAlbumTabIndex = 3;
+const int kLibraryTabIndex = 4;
 
 // Workaround for SQLite's variable limit (SQLITE_MAX_VARIABLE_NUMBER = 32766)
 const int kDriftMaxChunk = 32000;

@@ -254,9 +254,11 @@ class LoginForm extends HookConsumerWidget {
             }
             unawaited(handleSyncFlow());
             ref.read(websocketProvider.notifier).connect();
+            if (!context.mounted) return;
             unawaited(context.replaceRoute(const TabShellRoute()));
             return;
           }
+          if (!context.mounted) return;
           unawaited(context.replaceRoute(const TabControllerRoute()));
         }
       } catch (error) {
@@ -349,9 +351,11 @@ class LoginForm extends HookConsumerWidget {
                 await getManageMediaPermission();
               }
               unawaited(handleSyncFlow());
+              if (!context.mounted) return;
               unawaited(context.replaceRoute(const TabShellRoute()));
               return;
             }
+            if (!context.mounted) return;
             unawaited(context.replaceRoute(const TabControllerRoute()));
           }
         } catch (error, stack) {

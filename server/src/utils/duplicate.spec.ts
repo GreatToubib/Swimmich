@@ -1,5 +1,5 @@
 import { AssetResponseDto } from 'src/dtos/asset-response.dto';
-import { AssetType, AssetVisibility } from 'src/enum';
+import { AssetType, AssetVisibility, SortStatus } from 'src/enum';
 import { getExifCount, suggestDuplicate, suggestDuplicateKeepAssetIds } from 'src/utils/duplicate';
 import { describe, expect, it } from 'vitest';
 
@@ -30,6 +30,7 @@ const createAsset = (
   isTrashed: false,
   isOffline: false,
   isEdited: false,
+  sortStatus: SortStatus.New,
   visibility: AssetVisibility.Timeline,
   checksum: 'checksum',
   exifInfo:

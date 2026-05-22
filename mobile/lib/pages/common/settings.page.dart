@@ -18,6 +18,7 @@ import 'package:immich_mobile/widgets/settings/networking_settings/networking_se
 import 'package:immich_mobile/widgets/settings/notification_setting.dart';
 import 'package:immich_mobile/widgets/settings/preference_settings/preference_setting.dart';
 import 'package:immich_mobile/widgets/settings/settings_card.dart';
+import 'package:immich_mobile/widgets/settings/sort_settings.dart';
 
 enum SettingSection {
   advanced('advanced', Icons.build_outlined, "advanced_settings_tile_subtitle"),
@@ -29,6 +30,7 @@ enum SettingSection {
   notifications('notifications', Icons.notifications_none_rounded, "setting_notifications_subtitle"),
   preferences('preferences_settings_title', Icons.interests_outlined, "preferences_settings_subtitle"),
   timeline('asset_list_settings_title', Icons.auto_awesome_mosaic_outlined, "asset_list_settings_subtitle"),
+  sorting('Sort', Icons.style_outlined, 'Quick-pick album pins'),
   beta('sync_status', Icons.sync_outlined, "sync_status_subtitle");
 
   final String title;
@@ -46,6 +48,7 @@ enum SettingSection {
     SettingSection.notifications => const NotificationSetting(),
     SettingSection.preferences => const PreferenceSetting(),
     SettingSection.timeline => const AssetListSettings(),
+    SettingSection.sorting => const SortSettings(),
     SettingSection.beta => const SyncStatusAndActions(),
   };
 

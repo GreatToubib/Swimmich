@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'package:immich_mobile/providers/user.provider.dart';
 import 'package:immich_mobile/routing/router.dart';
 import 'package:immich_mobile/widgets/common/immich_toast.dart';
 import 'package:immich_mobile/widgets/common/remote_album_sliver_app_bar.dart';
+import 'package:openapi/api.dart' as openapi;
 
 @RoutePage()
 class RemoteAlbumPage extends ConsumerStatefulWidget {
@@ -143,11 +145,15 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
 
         unawaited(context.pushRoute(const DriftAlbumsRoute()));
       } catch (e) {
-        ImmichToast.show(
-          context: context,
-          msg: 'album_viewer_appbar_share_err_delete'.t(context: context),
-          toastType: ToastType.error,
-        );
+        String msg = 'album_viewer_appbar_share_err_delete'.t(context: context);
+        if (e is openapi.ApiException && e.code == 403) {
+          try {
+            final body = jsonDecode(e.message ?? '{}') as Map<String, dynamic>;
+            final serverMsg = body['message'];
+            if (serverMsg is String && serverMsg.isNotEmpty) msg = serverMsg;
+          } catch (_) {}
+        }
+        ImmichToast.show(context: context, msg: msg, toastType: ToastType.error);
       }
     }
   }

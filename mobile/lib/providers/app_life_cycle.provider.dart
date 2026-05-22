@@ -15,11 +15,13 @@ import 'package:immich_mobile/providers/backup/backup.provider.dart';
 import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
 import 'package:immich_mobile/providers/backup/ios_background_settings.provider.dart';
 import 'package:immich_mobile/providers/backup/manual_upload.provider.dart';
+import 'package:immich_mobile/providers/local_delete_queue.provider.dart';
 import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/memory.provider.dart';
 import 'package:immich_mobile/providers/notification_permission.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
@@ -96,10 +98,21 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
       }
 
       await _ref.read(serverInfoProvider.notifier).getServerVersion();
+
+      // Reload the sort deck on resume if the user is caught up (newly added
+      // photos default to sortStatus 'new' server-side and surface via search);
+      // never yank a mid-sort user.
+      final q = _ref.read(sortQueueProvider).valueOrNull;
+      if (q == null || q.current == null) {
+        unawaited(_ref.read(sortQueueProvider.notifier).refresh());
+      }
     }
 
     if (!Store.isBetaTimelineEnabled) {
       switch (_ref.read(tabProvider)) {
+        case TabEnum.sort:
+          break; // no background refresh needed for sort queue
+
         case TabEnum.home:
           await _ref.read(assetProvider.notifier).getAllAsset();
 
@@ -203,6 +216,10 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
   Future<void> handleAppPause() async {
     state = AppLifeCycleEnum.paused;
     _wasPaused = true;
+
+    // Flush any local-copy deletions queued while sorting (covers leaving the
+    // app without first switching tabs).
+    unawaited(_ref.read(localDeleteQueueProvider.notifier).flush());
 
     // Prevent overlapping pause operations
     if (_pauseOperation != null && !_pauseOperation!.isCompleted) {

@@ -17,6 +17,7 @@ import 'package:immich_mobile/models/search/search_filter.model.dart';
 import 'package:immich_mobile/models/shared_link/shared_link.model.dart';
 import 'package:immich_mobile/models/upload/share_intent_attachment.model.dart';
 import 'package:immich_mobile/pages/album/album_additional_shared_user_selection.page.dart';
+import 'package:immich_mobile/pages/sort/sort.page.dart';
 import 'package:immich_mobile/pages/album/album_asset_selection.page.dart';
 import 'package:immich_mobile/pages/album/album_options.page.dart';
 import 'package:immich_mobile/pages/album/album_shared_user_selection.page.dart';
@@ -172,6 +173,7 @@ class AppRouter extends RootStackRouter {
       page: TabControllerRoute.page,
       guards: [_authGuard, _duplicateGuard],
       children: [
+        AutoRoute(page: SortRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: PhotosRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: SearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
         AutoRoute(page: LibraryRoute.page, guards: [_authGuard, _duplicateGuard]),
@@ -182,6 +184,7 @@ class AppRouter extends RootStackRouter {
       page: TabShellRoute.page,
       guards: [_authGuard, _duplicateGuard],
       children: [
+        AutoRoute(page: SortRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: MainTimelineRoute.page, guards: [_authGuard, _duplicateGuard]),
         AutoRoute(page: DriftSearchRoute.page, guards: [_authGuard, _duplicateGuard], maintainState: false),
         AutoRoute(page: DriftLibraryRoute.page, guards: [_authGuard, _duplicateGuard]),

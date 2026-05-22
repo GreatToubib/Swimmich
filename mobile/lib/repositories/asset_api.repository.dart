@@ -105,6 +105,12 @@ class AssetApiRepository extends ApiRepository {
   Future<void> updateRating(String assetId, int rating) {
     return _api.updateAsset(assetId, UpdateAssetDto(rating: rating));
   }
+
+  /// Sets the Swimmich triage status, optionally also writing the star [rating]
+  /// (0 clears the rating server-side) in the same request.
+  Future<void> setSortStatus(String assetId, SortStatus status, {int? rating}) {
+    return _api.updateAsset(assetId, UpdateAssetDto(sortStatus: status, rating: rating));
+  }
 }
 
 extension on StackResponseDto {
