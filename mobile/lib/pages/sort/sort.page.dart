@@ -706,12 +706,12 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           child: _CountChip(remaining: widget.remaining),
         ),
 
-        // Local-delete toggle — top right, under the count chip. Only shown for
-        // photos that also exist on this device; makes clear it's a LOCAL delete.
+        // Local-delete toggle — top left, directly under the cloud badge. Only
+        // shown for photos that also exist on this device.
         if (_localId != null)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 52,
-            right: 16,
+            left: 16,
             child: _LocalDeleteToggle(
               active: _deleteLocalThisCard,
               onChanged: (v) => setState(() => _deleteLocalThisCard = v),
@@ -841,13 +841,13 @@ class _LocalDeleteToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: active
-          ? 'Will delete the copy on this phone (cloud copy kept)'
-          : 'Keep the copy on this phone',
+          ? 'This photo will be removed from the phone (the cloud copy is kept)'
+          : 'This photo will stay on the phone',
       triggerMode: TooltipTriggerMode.longPress,
       child: GestureDetector(
         onTap: () => onChanged(!active),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: active ? Colors.red.withValues(alpha: 0.85) : Colors.black54,
             borderRadius: BorderRadius.circular(20),
@@ -856,14 +856,19 @@ class _LocalDeleteToggle extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                active
-                    ? Icons.phonelink_erase
-                    : Icons.phonelink_erase_outlined,
+                active ? Icons.phonelink_erase : Icons.smartphone,
                 color: Colors.white,
                 size: 16,
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.smartphone, color: Colors.white, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                active ? 'Delete from phone' : 'Keep on phone',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
