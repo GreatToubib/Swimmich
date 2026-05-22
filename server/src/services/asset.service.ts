@@ -155,10 +155,11 @@ export class AssetService extends BaseService {
       duplicateId,
       dateTimeRelative,
       timeZone,
+      sortStatus,
     } = dto;
     await this.requireAccess({ auth, permission: Permission.AssetUpdate, ids });
 
-    const assetDto = _.omitBy({ isFavorite, visibility, duplicateId }, _.isUndefined);
+    const assetDto = _.omitBy({ isFavorite, visibility, duplicateId, sortStatus }, _.isUndefined);
     const exifDto = _.omitBy(
       {
         latitude,

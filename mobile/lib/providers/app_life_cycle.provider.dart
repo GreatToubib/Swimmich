@@ -25,7 +25,6 @@ import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
 import 'package:immich_mobile/services/background.service.dart';
-import 'package:immich_mobile/services/swimmich_bootstrap.service.dart';
 import 'package:isar/isar.dart';
 import 'package:logging/logging.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -99,16 +98,13 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
       await _ref.read(serverInfoProvider.notifier).getServerVersion();
 
-      // S1.8: Check for newly backed-up photos (fire-and-forget), then reload
-      // the sort deck if the user is caught up — never yank them mid-sort.
-      unawaited(
-        _ref.read(swimmichBootstrapServiceProvider).checkForNewAssets().then((_) {
-          final q = _ref.read(sortQueueProvider).valueOrNull;
-          if (q == null || q.current == null) {
-            _ref.read(sortQueueProvider.notifier).refresh();
-          }
-        }),
-      );
+      // Reload the sort deck on resume if the user is caught up (newly added
+      // photos default to sortStatus 'new' server-side and surface via search);
+      // never yank a mid-sort user.
+      final q = _ref.read(sortQueueProvider).valueOrNull;
+      if (q == null || q.current == null) {
+        unawaited(_ref.read(sortQueueProvider.notifier).refresh());
+      }
     }
 
     if (!Store.isBetaTimelineEnabled) {

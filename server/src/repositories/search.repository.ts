@@ -4,7 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { randomUUID } from 'node:crypto';
 import { DummyValue, GenerateSql } from 'src/decorators';
 import { MapAsset } from 'src/dtos/asset-response.dto';
-import { AssetStatus, AssetType, AssetVisibility, VectorIndex } from 'src/enum';
+import { AssetStatus, AssetType, AssetVisibility, SortStatus, VectorIndex } from 'src/enum';
 import { probes } from 'src/repositories/database.repository';
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
@@ -29,6 +29,7 @@ export type SearchIdOptions = SearchAssetIdOptions & SearchUserIdOptions;
 export interface SearchStatusOptions {
   isEncoded?: boolean;
   isFavorite?: boolean;
+  sortStatus?: SortStatus;
   isMotion?: boolean;
   isOffline?: boolean;
   isNotInAlbum?: boolean;

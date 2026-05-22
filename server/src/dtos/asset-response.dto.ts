@@ -13,7 +13,7 @@ import {
 } from 'src/dtos/person.dto';
 import { TagResponseDto, mapTag } from 'src/dtos/tag.dto';
 import { UserResponseDto, mapUser } from 'src/dtos/user.dto';
-import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum';
+import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm, SortStatus } from 'src/enum';
 import { ImageDimensions, MaybeDehydrated } from 'src/types';
 import { getDimensions } from 'src/utils/asset.util';
 import { hexOrBufferToBase64 } from 'src/utils/bytes';
@@ -138,6 +138,8 @@ export class AssetResponseDto extends SanitizedAssetResponseDto {
   resized?: boolean;
   @Property({ description: 'Is edited', history: new HistoryBuilder().added('v2.5.0').beta('v2.5.0') })
   isEdited!: boolean;
+  @ApiProperty({ description: 'Swimmich sort/triage status', enum: SortStatus, enumName: 'SortStatus' })
+  sortStatus!: SortStatus;
 }
 
 export type MapAsset = {
@@ -178,6 +180,7 @@ export type MapAsset = {
   width: number | null;
   height: number | null;
   isEdited: boolean;
+  sortStatus: SortStatus;
 };
 
 export class AssetStackResponseDto {
@@ -297,5 +300,6 @@ export function mapAsset(entity: MaybeDehydrated<MapAsset>, options: AssetMapOpt
     width: entity.width,
     height: entity.height,
     isEdited: entity.isEdited,
+    sortStatus: entity.sortStatus,
   };
 }

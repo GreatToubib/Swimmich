@@ -12,7 +12,7 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { UpdatedAtTrigger, UpdateIdColumn } from 'src/decorators';
-import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum';
+import { AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm, SortStatus } from 'src/enum';
 import { asset_checksum_algorithm_enum, asset_visibility_enum, assets_status_enum } from 'src/schema/enums';
 import { asset_delete_audit } from 'src/schema/functions';
 import { LibraryTable } from 'src/schema/tables/library.table';
@@ -151,4 +151,7 @@ export class AssetTable {
 
   @Column({ type: 'boolean', default: false })
   isEdited!: Generated<boolean>;
+
+  @Column({ type: 'character varying', default: SortStatus.New })
+  sortStatus!: Generated<SortStatus>;
 }

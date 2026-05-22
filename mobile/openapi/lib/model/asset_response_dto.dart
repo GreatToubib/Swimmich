@@ -40,6 +40,7 @@ class AssetResponseDto {
     required this.ownerId,
     this.people = const [],
     this.resized,
+    required this.sortStatus,
     this.stack,
     this.tags = const [],
     required this.thumbhash,
@@ -152,6 +153,9 @@ class AssetResponseDto {
   ///
   bool? resized;
 
+  /// Swimmich sort/triage status
+  SortStatus sortStatus;
+
   AssetStackResponseDto? stack;
 
   List<TagResponseDto> tags;
@@ -202,6 +206,7 @@ class AssetResponseDto {
     other.ownerId == ownerId &&
     _deepEquality.equals(other.people, people) &&
     other.resized == resized &&
+    other.sortStatus == sortStatus &&
     other.stack == stack &&
     _deepEquality.equals(other.tags, tags) &&
     other.thumbhash == thumbhash &&
@@ -241,6 +246,7 @@ class AssetResponseDto {
     (ownerId.hashCode) +
     (people.hashCode) +
     (resized == null ? 0 : resized!.hashCode) +
+    (sortStatus.hashCode) +
     (stack == null ? 0 : stack!.hashCode) +
     (tags.hashCode) +
     (thumbhash == null ? 0 : thumbhash!.hashCode) +
@@ -251,7 +257,7 @@ class AssetResponseDto {
     (width == null ? 0 : width!.hashCode);
 
   @override
-  String toString() => 'AssetResponseDto[checksum=$checksum, createdAt=$createdAt, deviceAssetId=$deviceAssetId, deviceId=$deviceId, duplicateId=$duplicateId, duration=$duration, exifInfo=$exifInfo, fileCreatedAt=$fileCreatedAt, fileModifiedAt=$fileModifiedAt, hasMetadata=$hasMetadata, height=$height, id=$id, isArchived=$isArchived, isEdited=$isEdited, isFavorite=$isFavorite, isOffline=$isOffline, isTrashed=$isTrashed, libraryId=$libraryId, livePhotoVideoId=$livePhotoVideoId, localDateTime=$localDateTime, originalFileName=$originalFileName, originalMimeType=$originalMimeType, originalPath=$originalPath, owner=$owner, ownerId=$ownerId, people=$people, resized=$resized, stack=$stack, tags=$tags, thumbhash=$thumbhash, type=$type, unassignedFaces=$unassignedFaces, updatedAt=$updatedAt, visibility=$visibility, width=$width]';
+  String toString() => 'AssetResponseDto[checksum=$checksum, createdAt=$createdAt, deviceAssetId=$deviceAssetId, deviceId=$deviceId, duplicateId=$duplicateId, duration=$duration, exifInfo=$exifInfo, fileCreatedAt=$fileCreatedAt, fileModifiedAt=$fileModifiedAt, hasMetadata=$hasMetadata, height=$height, id=$id, isArchived=$isArchived, isEdited=$isEdited, isFavorite=$isFavorite, isOffline=$isOffline, isTrashed=$isTrashed, libraryId=$libraryId, livePhotoVideoId=$livePhotoVideoId, localDateTime=$localDateTime, originalFileName=$originalFileName, originalMimeType=$originalMimeType, originalPath=$originalPath, owner=$owner, ownerId=$ownerId, people=$people, resized=$resized, sortStatus=$sortStatus, stack=$stack, tags=$tags, thumbhash=$thumbhash, type=$type, unassignedFaces=$unassignedFaces, updatedAt=$updatedAt, visibility=$visibility, width=$width]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -314,6 +320,7 @@ class AssetResponseDto {
     } else {
     //  json[r'resized'] = null;
     }
+      json[r'sortStatus'] = this.sortStatus;
     if (this.stack != null) {
       json[r'stack'] = this.stack;
     } else {
@@ -375,6 +382,7 @@ class AssetResponseDto {
         ownerId: mapValueOfType<String>(json, r'ownerId')!,
         people: PersonWithFacesResponseDto.listFromJson(json[r'people']),
         resized: mapValueOfType<bool>(json, r'resized'),
+        sortStatus: SortStatus.fromJson(json[r'sortStatus'])!,
         stack: AssetStackResponseDto.fromJson(json[r'stack']),
         tags: TagResponseDto.listFromJson(json[r'tags']),
         thumbhash: mapValueOfType<String>(json, r'thumbhash'),
@@ -451,6 +459,7 @@ class AssetResponseDto {
     'originalFileName',
     'originalPath',
     'ownerId',
+    'sortStatus',
     'thumbhash',
     'type',
     'updatedAt',

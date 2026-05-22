@@ -1,5 +1,5 @@
 import { Selectable } from 'kysely';
-import { AssetFileType, AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm } from 'src/enum';
+import { AssetFileType, AssetStatus, AssetType, AssetVisibility, ChecksumAlgorithm, SortStatus } from 'src/enum';
 import { AssetTable } from 'src/schema/tables/asset.table';
 import { StackTable } from 'src/schema/tables/stack.table';
 import { AssetEditFactory } from 'test/factories/asset-edit.factory';
@@ -76,6 +76,7 @@ export class AssetFactory {
       width: null,
       height: null,
       isEdited: false,
+      sortStatus: SortStatus.New,
       ...dto,
     });
   }
