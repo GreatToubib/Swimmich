@@ -1,6 +1,8 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
+import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
 import 'package:openapi/api.dart';
@@ -18,6 +20,7 @@ class UndoRecord {
     this.favorite = false,
     this.previousFavorite = false,
     this.previousSortStatus = SortStatus.new_,
+    this.localDeleteId,
   });
 
   final AssetResponseDto asset;
@@ -43,6 +46,10 @@ class UndoRecord {
 
   /// The asset's triage status before this sort, so undo can restore it.
   final SortStatus previousSortStatus;
+
+  /// The device-asset id queued for local deletion by this swipe, if any.
+  /// Undo uses it to cancel the pending local delete.
+  final String? localDeleteId;
 }
 
 /// Executes the three sort-deck actions against native Immich asset fields:
@@ -53,11 +60,22 @@ class SortActionService {
     this._assetRepo,
     this._albumRepo,
     this._driftAlbumRepo,
+    this._driftAssetRepo,
   );
 
   final AssetApiRepository _assetRepo;
   final AlbumApiRepository _albumRepo;
   final DriftRemoteAlbumRepository _driftAlbumRepo;
+  final RemoteAssetRepository _driftAssetRepo;
+
+  /// Best-effort mirror of a server change into the local Drift store so the
+  /// Photos/timeline view reflects it immediately (no app restart / full sync).
+  /// Failures are swallowed — the periodic remote sync reconciles later.
+  Future<void> _mirror(Future<void> Function() op) async {
+    try {
+      await op();
+    } catch (_) {}
+  }
 
   /// Adds an asset to a user album on the server, then mirrors the change into
   /// the local Drift DB so the Albums view reflects it without a full re-sync.
@@ -107,9 +125,13 @@ class SortActionService {
       case SortAction.delete:
         // Soft-delete (trash); force: false keeps it recoverable.
         await _assetRepo.delete([assetId], false);
+        // Mirror: drop it from the local timeline at once.
+        await _mirror(() => _driftAssetRepo.trash([assetId]));
 
       case SortAction.reviewLater:
         await _assetRepo.setSortStatus(assetId, SortStatus.reviewLater);
+        // sortStatus isn't part of the local schema and isn't shown in the
+        // Photos view, so there is nothing to mirror here.
 
       case SortAction.sorted:
         // Keep: native triage status + rating + favourite, plus optional
@@ -125,6 +147,11 @@ class SortActionService {
           quickPickAlbumIds.toSet(),
           previousQuickPickAlbumIds.toSet(),
         );
+        // Mirror favourite + rating into the local store for the Photos view.
+        await _mirror(() => _driftAssetRepo.updateFavorite([assetId], favorite));
+        if (starRating != null) {
+          await _mirror(() => _driftAssetRepo.updateRating(assetId, starRating));
+        }
     }
   }
 
@@ -134,6 +161,7 @@ class SortActionService {
     switch (record.action) {
       case SortAction.delete:
         await _assetRepo.restoreTrash([assetId]);
+        await _mirror(() => _driftAssetRepo.restoreTrash([assetId]));
 
       case SortAction.reviewLater:
         await _assetRepo.setSortStatus(assetId, record.previousSortStatus);
@@ -151,6 +179,11 @@ class SortActionService {
         final target = record.quickPickIds.toSet();
         final previous = record.previousQuickPickIds.toSet();
         await _reconcileAlbums(assetId, previous, target);
+        // Mirror the restored favourite + rating into the local store.
+        await _mirror(
+            () => _driftAssetRepo.updateFavorite([assetId], record.previousFavorite));
+        await _mirror(() =>
+            _driftAssetRepo.updateRating(assetId, record.previousStarRating));
     }
   }
 }
@@ -160,5 +193,6 @@ final sortActionServiceProvider = Provider<SortActionService>(
     ref.watch(assetApiRepositoryProvider),
     ref.watch(albumApiRepositoryProvider),
     ref.watch(remoteAlbumRepository),
+    ref.watch(remoteAssetRepositoryProvider),
   ),
 );

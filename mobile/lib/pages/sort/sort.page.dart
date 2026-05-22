@@ -6,6 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
+import 'package:immich_mobile/pages/sort/sort_source_sheet.dart';
+import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
+import 'package:immich_mobile/providers/local_delete_queue.provider.dart';
+import 'package:immich_mobile/providers/sort_filter.provider.dart';
+import 'package:immich_mobile/providers/sort_settings.provider.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
 import 'package:immich_mobile/presentation/sort/star_rating_bar.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
@@ -94,10 +99,25 @@ class SortPage extends HookConsumerWidget {
           unawaited(ref.read(sortQueueProvider.notifier).refresh());
         }
       }
+      // Leaving the Sort tab: flush any queued local-copy deletions in one batch.
+      if (prev == TabEnum.sort && next != TabEnum.sort) {
+        unawaited(ref.read(localDeleteQueueProvider.notifier).flush());
+      }
     });
 
+    // Flush queued local deletions once the deck is fully drained.
+    final caughtUp = queueAsync.valueOrNull != null &&
+        queueAsync.valueOrNull!.current == null &&
+        !queueAsync.valueOrNull!.hasMore;
+    useEffect(() {
+      if (caughtUp) {
+        unawaited(ref.read(localDeleteQueueProvider.notifier).flush());
+      }
+      return null;
+    }, [caughtUp]);
+
     return Scaffold(
-      appBar: const ImmichAppBar(),
+      appBar: const ImmichAppBar(actions: [_SortFilterButton()]),
       backgroundColor: Colors.black,
       body: queueAsync.when(
         loading: () => const _LoadingView(),
@@ -260,6 +280,14 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   /// Whether the current card is marked favourite (heart toggle).
   bool _isFavorite = false;
 
+  /// The device-asset id of this card's local copy, if it also exists on this
+  /// phone (null = cloud-only). Drives the storage ✓ and the local-delete.
+  String? _localId;
+
+  /// Whether this card's local copy should be queued for deletion on swipe.
+  /// Seeded from the [deleteLocalOnSortProvider] setting; user-overridable.
+  bool _deleteLocalThisCard = false;
+
   /// The asset's state when the card opened (edit mode), used to compute what
   /// to revert on undo and which albums to remove when de-selected.
   Set<String> _originalUserAlbumIds = const {};
@@ -325,15 +353,31 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     _originalFavorite = asset.isFavorite;
     _originalSortStatus = asset.sortStatus;
     _originalUserAlbumIds = const {};
+    _localId = null;
     Future.microtask(() {
       if (!mounted || widget.asset.id != asset.id) return;
       setState(() {
         _starRating = rating;
         _isFavorite = asset.isFavorite;
+        _deleteLocalThisCard = ref.read(deleteLocalOnSortProvider);
       });
       ref.read(quickPickProvider.notifier).clearSelection();
       unawaited(_prefillAlbums(asset.id));
+      unawaited(_resolveLocalId(asset.id));
     });
+  }
+
+  /// Looks up whether this card's photo also exists locally on this device
+  /// (matched by checksum in the Drift store) and records its device-asset id.
+  Future<void> _resolveLocalId(String assetId) async {
+    try {
+      final remote =
+          await ref.read(remoteAssetRepositoryProvider).get(assetId);
+      if (!mounted || widget.asset.id != assetId) return;
+      setState(() => _localId = remote?.localId);
+    } catch (_) {
+      // Best-effort; treat as cloud-only on failure.
+    }
   }
 
   /// Looks up which user albums the asset is already in and pre-selects the
@@ -475,6 +519,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     final previousStar = _originalStarRating;
     final previousFavorite = _originalFavorite;
     final previousSortStatus = _originalSortStatus;
+    // Queue the local copy for batched deletion if the card opted in.
+    final localDeleteId =
+        (_deleteLocalThisCard && _localId != null) ? _localId : null;
 
     // Reset drag state. The rating/selection for the next card are reset and
     // re-filled by didUpdateWidget → _resetAndPrefill once it slides in.
@@ -496,8 +543,14 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       favorite: favorite,
       previousFavorite: previousFavorite,
       previousSortStatus: previousSortStatus,
+      localDeleteId: localDeleteId,
     );
     ref.read(undoStackProvider.notifier).push(record);
+
+    // Queue the local-copy deletion (flushed in one batch on leaving the deck).
+    if (localDeleteId != null) {
+      ref.read(localDeleteQueueProvider.notifier).add(localDeleteId);
+    }
 
     if (action == SortAction.delete && mounted) {
       showSwimmichUndoBanner(
@@ -536,6 +589,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   Future<void> _executeUndo(UndoRecord record) async {
     ref.read(undoStackProvider.notifier).pop();
     ref.read(sortQueueProvider.notifier).insertAtCurrent(record.asset);
+    // Cancel any pending local-copy deletion for this card.
+    if (record.localDeleteId != null) {
+      ref.read(localDeleteQueueProvider.notifier).remove(record.localDeleteId!);
+    }
     try {
       await ref.read(sortActionServiceProvider).undo(record);
     } catch (e) {
@@ -639,7 +696,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
         Positioned(
           top: MediaQuery.paddingOf(context).top + 12,
           left: 16,
-          child: StorageBadge(asset: widget.asset),
+          child: StorageBadge(asset: widget.asset, isLocal: _localId != null),
         ),
 
         // Remaining-count chip — top right.
@@ -648,6 +705,18 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           right: 16,
           child: _CountChip(remaining: widget.remaining),
         ),
+
+        // Local-delete toggle — top right, under the count chip. Only shown for
+        // photos that also exist on this device; makes clear it's a LOCAL delete.
+        if (_localId != null)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 52,
+            right: 16,
+            child: _LocalDeleteToggle(
+              active: _deleteLocalThisCard,
+              onChanged: (v) => setState(() => _deleteLocalThisCard = v),
+            ),
+          ),
 
         // Video indicator — centred play icon shown while the card is at rest.
         if (widget.asset.type == AssetTypeEnum.VIDEO && _drag.distance < 15)
@@ -730,6 +799,74 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           // Main (draggable) card on top.
           Positioned.fill(child: mainCard),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Source filter button (app-bar header) ────────────────────────────────────
+
+/// Header button that opens the two-section (status + album) source filter.
+/// A badge shows how many filter options are currently selected.
+class _SortFilterButton extends ConsumerWidget {
+  const _SortFilterButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(sortFilterProvider).selectionCount;
+    return IconButton(
+      tooltip: 'Filter photos to sort',
+      onPressed: () => showSortSourceSheet(context, ref),
+      icon: Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        child: const Icon(Icons.filter_list),
+      ),
+    );
+  }
+}
+
+// ─── Local-delete toggle ───────────────────────────────────────────────────────
+
+/// Per-card toggle that marks the photo's LOCAL (phone) copy for deletion. The
+/// phone glyph + tooltip make clear this removes the device copy only — the
+/// cloud copy is untouched. Queued deletes are flushed in one batch on leaving.
+class _LocalDeleteToggle extends StatelessWidget {
+  const _LocalDeleteToggle({required this.active, required this.onChanged});
+
+  final bool active;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: active
+          ? 'Will delete the copy on this phone (cloud copy kept)'
+          : 'Keep the copy on this phone',
+      triggerMode: TooltipTriggerMode.longPress,
+      child: GestureDetector(
+        onTap: () => onChanged(!active),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: active ? Colors.red.withValues(alpha: 0.85) : Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                active
+                    ? Icons.phonelink_erase
+                    : Icons.phonelink_erase_outlined,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.smartphone, color: Colors.white, size: 14),
+            ],
+          ),
+        ),
       ),
     );
   }

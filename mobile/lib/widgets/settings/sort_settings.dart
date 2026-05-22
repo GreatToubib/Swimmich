@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/album.entity.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/providers/sort_settings.provider.dart';
 import 'package:immich_mobile/repositories/album_api.repository.dart';
 
 /// Settings widget for configuring the 3 pinned quick-pick album slots.
@@ -14,6 +15,7 @@ class SortSettings extends ConsumerWidget {
     final qp = ref.watch(quickPickProvider);
     final albumState = ref.watch(remoteAlbumProvider);
     final albums = albumState.albums;
+    final deleteLocalDefault = ref.watch(deleteLocalOnSortProvider);
 
     // Trigger a load so chip names display correctly even if Albums tab
     // was never visited. Safe to call on every build — the notifier debounces.
@@ -66,6 +68,19 @@ class SortSettings extends ConsumerWidget {
         pinnedTile(1),
         pinnedTile(2),
         pinnedTile(3),
+        const Divider(),
+        SwitchListTile(
+          secondary: const Icon(Icons.phonelink_erase_outlined),
+          title: const Text('Delete local copy when sorting'),
+          subtitle: const Text(
+            'Default for the per-card trash toggle. When on, sorting a photo '
+            'that is also on this device queues its local copy for deletion '
+            '(batched, with one confirmation). The cloud copy is unaffected.',
+          ),
+          value: deleteLocalDefault,
+          onChanged: (v) =>
+              ref.read(deleteLocalOnSortProvider.notifier).set(v),
+        ),
       ],
     );
   }
