@@ -11,11 +11,18 @@ class SortQueueState {
     required this.assets,
     this.currentIndex = 0,
     this.hasMore = true,
+    this.totalToSort = 0,
   });
 
   final List<AssetResponseDto> assets;
   final int currentIndex;
   final bool hasMore;
+
+  /// The session's starting count of cards to sort, summed from the source
+  /// albums' assetCount. The live "left" count is derived from this minus how
+  /// far the user has advanced, so the chip shows the true pile size (e.g.
+  /// "150 left") rather than just the lazily-loaded batch. 0 = unknown.
+  final int totalToSort;
 
   /// The asset currently at the top of the deck, or null when the queue is empty.
   AssetResponseDto? get current =>
@@ -25,6 +32,14 @@ class SortQueueState {
 
   /// How many cards remain from the current position to the end of the loaded list.
   int get remaining => assets.length - currentIndex;
+
+  /// The true number of cards left to sort. Uses the source-album total when
+  /// known (so lazy loading is invisible), falling back to the loaded count.
+  int get leftToSort {
+    if (totalToSort <= 0) return remaining;
+    final left = totalToSort - currentIndex;
+    return left < 0 ? 0 : left;
+  }
 
   /// The asset directly behind the current card (for the peek effect), or null.
   AssetResponseDto? get nextAsset {
@@ -36,18 +51,20 @@ class SortQueueState {
     List<AssetResponseDto>? assets,
     int? currentIndex,
     bool? hasMore,
+    int? totalToSort,
   }) =>
       SortQueueState(
         assets: assets ?? this.assets,
         currentIndex: currentIndex ?? this.currentIndex,
         hasMore: hasMore ?? this.hasMore,
+        totalToSort: totalToSort ?? this.totalToSort,
       );
 }
 
 class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   static const _pageSize = 20;
   static const _prefetchAhead = 5;
-  static const _loadMoreThreshold = 5;
+  static const _loadMoreThreshold = 10;
 
   /// Per-album page cursor (next page to fetch). An album removed from this map
   /// is exhausted (no more pages).
@@ -70,42 +87,54 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   ///
   /// Falls back to New + Review Later when the user selection is still empty
   /// (e.g. before async defaults have resolved).
-  Future<List<String>> _albumIds() async {
+  ///
+  /// Also returns the true total number of cards to sort, summed from the
+  /// source albums' `assetCount` (the only reliable count — Immich's search
+  /// `total` is hardcoded to the page size). An asset in two source albums is
+  /// double-counted, but that is rare and acceptable for a "left" indicator.
+  Future<({List<String> ids, int total})> _resolveSources() async {
     final selected = ref.read(sortSourceAlbumsProvider);
     final allAlbums =
-        await ref.read(apiServiceProvider).albumsApi.getAllAlbums();
+        await ref.read(apiServiceProvider).albumsApi.getAllAlbums() ?? [];
 
     String? kindId(String kind) => allAlbums
-        ?.where((a) => a.systemKind == kind)
+        .where((a) => a.systemKind == kind)
         .map((a) => a.id)
         .firstOrNull;
 
     final newId = kindId('new');
     final rlId = kindId('review_later');
 
+    final List<String> ordered;
     if (selected.isEmpty) {
-      return [if (newId != null) newId, if (rlId != null) rlId];
+      ordered = [if (newId != null) newId, if (rlId != null) rlId];
+    } else {
+      ordered = <String>[];
+      if (newId != null && selected.contains(newId)) ordered.add(newId);
+      if (rlId != null && selected.contains(rlId)) ordered.add(rlId);
+      for (final id in selected) {
+        if (id != newId && id != rlId) ordered.add(id);
+      }
     }
 
-    final ordered = <String>[];
-    if (newId != null && selected.contains(newId)) ordered.add(newId);
-    if (rlId != null && selected.contains(rlId)) ordered.add(rlId);
-    for (final id in selected) {
-      if (id != newId && id != rlId) ordered.add(id);
-    }
-    return ordered;
+    final idSet = ordered.toSet();
+    final total = allAlbums
+        .where((a) => idSet.contains(a.id))
+        .fold<int>(0, (sum, a) => sum + a.assetCount);
+
+    return (ids: ordered, total: total);
   }
 
   Future<SortQueueState> _initLoad() async {
-    final albumIds = await _albumIds();
-    if (albumIds.isEmpty) {
+    final sources = await _resolveSources();
+    if (sources.ids.isEmpty) {
       _log.warning('No source album ids found — system albums may not be provisioned yet');
       return const SortQueueState(assets: [], hasMore: false);
     }
-    for (final id in albumIds) {
+    for (final id in sources.ids) {
       _cursors[id] = 1;
     }
-    return _fetchNextBatch(const []);
+    return _fetchNextBatch(const [], totalToSort: sources.total);
   }
 
   /// Fetches the next page from the highest-priority non-exhausted source album
@@ -117,7 +146,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   /// so each album is queried independently with its own page cursor.
   /// [_cursors] preserves insertion (= priority) order.
   Future<SortQueueState> _fetchNextBatch(
-      List<AssetResponseDto> existing) async {
+      List<AssetResponseDto> existing, {
+      int totalToSort = 0,
+      }) async {
     final seen = existing.map((a) => a.id).toSet();
     final merged = <AssetResponseDto>[...existing];
     final search = ref.read(apiServiceProvider).searchApi;
@@ -158,6 +189,7 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
       assets: merged,
       currentIndex: existing.isEmpty ? 0 : existing.length,
       hasMore: _cursors.isNotEmpty,
+      totalToSort: totalToSort,
     );
   }
 
@@ -171,9 +203,14 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
 
     final next = s.currentIndex + 1;
 
-    // Transparently load the next batch when running low.
-    if (s.hasMore && (s.assets.length - next) < _loadMoreThreshold) {
-      final updated = await _fetchNextBatch(s.assets);
+    // Transparently load the next batch when running low, and always await a
+    // fetch before exposing a gap at the exact end of the loaded list — so the
+    // deck never flashes the "all caught up" view while more cards exist.
+    if (s.hasMore &&
+        (next >= s.assets.length ||
+            (s.assets.length - next) < _loadMoreThreshold)) {
+      final updated =
+          await _fetchNextBatch(s.assets, totalToSort: s.totalToSort);
       state = AsyncData(updated.copyWith(currentIndex: next));
       return;
     }

@@ -20,6 +20,7 @@ import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/memory.provider.dart';
 import 'package:immich_mobile/providers/notification_permission.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
+import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/providers/websocket.provider.dart';
 import 'package:immich_mobile/services/app_settings.service.dart';
@@ -98,9 +99,15 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
       await _ref.read(serverInfoProvider.notifier).getServerVersion();
 
-      // S1.8: Check for newly backed-up photos (fire-and-forget).
+      // S1.8: Check for newly backed-up photos (fire-and-forget), then reload
+      // the sort deck if the user is caught up — never yank them mid-sort.
       unawaited(
-        _ref.read(swimmichBootstrapServiceProvider).checkForNewAssets(),
+        _ref.read(swimmichBootstrapServiceProvider).checkForNewAssets().then((_) {
+          final q = _ref.read(sortQueueProvider).valueOrNull;
+          if (q == null || q.current == null) {
+            _ref.read(sortQueueProvider.notifier).refresh();
+          }
+        }),
       );
     }
 

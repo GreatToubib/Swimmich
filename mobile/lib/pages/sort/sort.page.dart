@@ -55,6 +55,25 @@ Future<void> _refreshAlbumsAndPrune(WidgetRef ref) async {
   }
 }
 
+/// Scans the server for newly-synced photos (adding them to _New), then reloads
+/// the deck so they appear without the user tapping "Check again".
+///
+/// [forceRefresh] reloads the deck unconditionally (cold open). Otherwise the
+/// deck is only reloaded when it's empty/caught-up, so a mid-sort user is never
+/// yanked back to the top of the pile.
+Future<void> _checkForNewAndRefresh(WidgetRef ref,
+    {required bool forceRefresh}) async {
+  try {
+    await ref.read(swimmichBootstrapServiceProvider).checkForNewAssets();
+  } catch (_) {
+    // Offline or transient failure — skip the refresh.
+  }
+  final q = ref.read(sortQueueProvider).valueOrNull;
+  if (forceRefresh || q == null || q.current == null) {
+    await ref.read(sortQueueProvider.notifier).refresh();
+  }
+}
+
 @RoutePage()
 class SortPage extends HookConsumerWidget {
   const SortPage({super.key});
@@ -78,18 +97,22 @@ class SortPage extends HookConsumerWidget {
       [queueAsync.valueOrNull?.currentIndex],
     );
 
-    // On first mount: load album names and prune deleted quick-pick chips.
+    // On first mount: load album names, prune deleted quick-pick chips, and
+    // pull any newly-synced photos into the deck (cold-open auto-check).
     useEffect(() {
       unawaited(_refreshAlbumsAndPrune(ref));
+      unawaited(_checkForNewAndRefresh(ref, forceRefresh: true));
       return null;
     }, const []);
 
     // The Sort tab is kept alive by AutoTabsRouter, so this page does not
     // remount when re-opened. Re-run the refresh+prune each time the Sort tab
-    // becomes active, to catch albums deleted on the server in the meantime.
+    // becomes active, to catch albums deleted on the server in the meantime,
+    // and auto-check for new photos (without yanking a mid-sort user).
     ref.listen<TabEnum>(tabProvider, (prev, next) {
       if (next == TabEnum.sort && prev != TabEnum.sort) {
         unawaited(_refreshAlbumsAndPrune(ref));
+        unawaited(_checkForNewAndRefresh(ref, forceRefresh: false));
       }
     });
 
@@ -104,20 +127,24 @@ class SortPage extends HookConsumerWidget {
         error: (e, _) =>
             _ErrorView(error: e.toString(), onRetry: notifier.refresh),
         data: (queue) => queue.current == null
-            ? _AllCaughtUpView(
-                onRefresh: () async {
-                  await ref
-                      .read(swimmichBootstrapServiceProvider)
-                      .checkForNewAssets();
-                  await notifier.refresh();
-                },
-              )
+            // A batch is still loading — keep the spinner so the lazy paging is
+            // invisible; only show "all caught up" once truly exhausted.
+            ? (queue.hasMore
+                ? const _LoadingView()
+                : _AllCaughtUpView(
+                    onRefresh: () async {
+                      await ref
+                          .read(swimmichBootstrapServiceProvider)
+                          .checkForNewAssets();
+                      await notifier.refresh();
+                    },
+                  ))
             : Column(
                 children: [
                   Expanded(
                     child: _SortDeckView(
                       asset: queue.current!,
-                      remaining: queue.remaining,
+                      remaining: queue.leftToSort,
                       nextAsset: queue.nextAsset,
                     ),
                   ),

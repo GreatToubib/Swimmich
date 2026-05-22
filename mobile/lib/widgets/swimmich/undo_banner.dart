@@ -10,7 +10,7 @@ void showSwimmichUndoBanner(
   BuildContext context, {
   required String message,
   required VoidCallback onUndo,
-  Duration visible = const Duration(milliseconds: 800),
+  Duration visible = const Duration(milliseconds: 2000),
   Duration fadeOut = const Duration(milliseconds: 200),
 }) {
   _currentEntry?.remove();
@@ -96,7 +96,7 @@ class _UndoBannerState extends State<_UndoBanner> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Positioned(
-      bottom: 160,
+      top: MediaQuery.paddingOf(context).top + 48,
       left: 16,
       right: 16,
       child: IgnorePointer(
