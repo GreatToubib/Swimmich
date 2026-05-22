@@ -563,6 +563,7 @@ Class | Method | HTTP request | Description
  - [SharedLinksUpdate](doc//SharedLinksUpdate.md)
  - [SignUpDto](doc//SignUpDto.md)
  - [SmartSearchDto](doc//SmartSearchDto.md)
+ - [SortStatus](doc//SortStatus.md)
  - [SourceType](doc//SourceType.md)
  - [StackCreateDto](doc//StackCreateDto.md)
  - [StackResponseDto](doc//StackResponseDto.md)

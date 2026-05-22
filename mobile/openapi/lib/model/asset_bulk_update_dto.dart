@@ -22,6 +22,7 @@ class AssetBulkUpdateDto {
     this.latitude,
     this.longitude,
     this.rating,
+    this.sortStatus,
     this.timeZone,
     this.visibility,
   });
@@ -92,6 +93,15 @@ class AssetBulkUpdateDto {
   /// Maximum value: 5
   num? rating;
 
+  /// Swimmich sort/triage status
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  SortStatus? sortStatus;
+
   /// Time zone (IANA timezone)
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -121,6 +131,7 @@ class AssetBulkUpdateDto {
     other.latitude == latitude &&
     other.longitude == longitude &&
     other.rating == rating &&
+    other.sortStatus == sortStatus &&
     other.timeZone == timeZone &&
     other.visibility == visibility;
 
@@ -136,11 +147,12 @@ class AssetBulkUpdateDto {
     (latitude == null ? 0 : latitude!.hashCode) +
     (longitude == null ? 0 : longitude!.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (timeZone == null ? 0 : timeZone!.hashCode) +
     (visibility == null ? 0 : visibility!.hashCode);
 
   @override
-  String toString() => 'AssetBulkUpdateDto[dateTimeOriginal=$dateTimeOriginal, dateTimeRelative=$dateTimeRelative, description=$description, duplicateId=$duplicateId, ids=$ids, isFavorite=$isFavorite, latitude=$latitude, longitude=$longitude, rating=$rating, timeZone=$timeZone, visibility=$visibility]';
+  String toString() => 'AssetBulkUpdateDto[dateTimeOriginal=$dateTimeOriginal, dateTimeRelative=$dateTimeRelative, description=$description, duplicateId=$duplicateId, ids=$ids, isFavorite=$isFavorite, latitude=$latitude, longitude=$longitude, rating=$rating, sortStatus=$sortStatus, timeZone=$timeZone, visibility=$visibility]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -185,6 +197,11 @@ class AssetBulkUpdateDto {
     } else {
     //  json[r'rating'] = null;
     }
+    if (this.sortStatus != null) {
+      json[r'sortStatus'] = this.sortStatus;
+    } else {
+    //  json[r'sortStatus'] = null;
+    }
     if (this.timeZone != null) {
       json[r'timeZone'] = this.timeZone;
     } else {
@@ -220,6 +237,7 @@ class AssetBulkUpdateDto {
         rating: json[r'rating'] == null
             ? null
             : num.parse('${json[r'rating']}'),
+        sortStatus: SortStatus.fromJson(json[r'sortStatus']),
         timeZone: mapValueOfType<String>(json, r'timeZone'),
         visibility: AssetVisibility.fromJson(json[r'visibility']),
       );

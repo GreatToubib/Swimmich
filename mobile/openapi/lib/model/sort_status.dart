@@ -85,3 +85,4 @@ class SortStatusTypeTransformer {
   /// Singleton [SortStatusTypeTransformer] instance.
   static SortStatusTypeTransformer? _instance;
 }
+
