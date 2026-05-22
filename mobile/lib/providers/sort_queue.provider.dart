@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
+import 'package:immich_mobile/providers/sort_filter.provider.dart';
 import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 
@@ -47,50 +48,76 @@ class SortQueueState {
       );
 }
 
+/// One query stream: a (status × album-option) combination. [noAlbum] true means
+/// "not in any album"; otherwise [albumId] is a specific album. Immich ANDs
+/// `albumIds`, so unions across albums are achieved with separate specs.
+class _SourceSpec {
+  _SourceSpec({required this.status, this.albumId, this.noAlbum = false});
+  final SortStatus status;
+  final String? albumId;
+  final bool noAlbum;
+}
+
 class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   static const _pageSize = 20;
   static const _prefetchAhead = 5;
   static const _loadMoreThreshold = 10;
 
-  /// The triage statuses the deck drains, in display-priority order: freshly
-  /// added (`new`) photos first, then anything explicitly deferred for review.
-  static const _sources = <SortStatus>[
-    SortStatus.new_,
-    SortStatus.reviewLater,
-  ];
-
-  /// Index into [_sources] of the status currently being drained, plus the next
-  /// page to fetch for it. When [_sourceIndex] runs past the list, the deck is
-  /// exhausted.
-  int _sourceIndex = 0;
+  /// Query specs derived from the active filter, drained one at a time.
+  List<_SourceSpec> _specs = const [];
+  int _specIndex = 0;
   int _page = 1;
   final _log = Logger('SortQueueNotifier');
 
   @override
   Future<SortQueueState> build() {
-    _sourceIndex = 0;
+    // Rebuild whenever the source filter changes.
+    final filter = ref.watch(sortFilterProvider);
+    _specs = _buildSpecs(filter);
+    _specIndex = 0;
     _page = 1;
     return _fetchNextBatch(const []);
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────
 
-  /// Fetches the next page from the highest-priority non-exhausted status and
-  /// appends new (deduped) assets to [existing]. Statuses are drained one at a
-  /// time in priority order, so cards appear grouped by status.
+  /// Cross-product of selected statuses × selected album options. Statuses are
+  /// ordered new → review_later → kept; the "No album" option comes before
+  /// specific albums so unsorted-and-unfiled photos surface first.
+  List<_SourceSpec> _buildSpecs(SortFilterState filter) {
+    const statusOrder = [
+      SortStatus.new_,
+      SortStatus.reviewLater,
+      SortStatus.kept,
+    ];
+    final statuses = statusOrder.where(filter.statuses.contains).toList();
+    final specs = <_SourceSpec>[];
+    for (final status in statuses) {
+      if (filter.noAlbum) {
+        specs.add(_SourceSpec(status: status, noAlbum: true));
+      }
+      for (final albumId in filter.albumIds) {
+        specs.add(_SourceSpec(status: status, albumId: albumId));
+      }
+    }
+    return specs;
+  }
+
+  /// Fetches the next page from the highest-priority non-exhausted spec and
+  /// appends new (deduped) assets to [existing].
   Future<SortQueueState> _fetchNextBatch(List<AssetResponseDto> existing) async {
     final seen = existing.map((a) => a.id).toSet();
     final merged = <AssetResponseDto>[...existing];
     final search = ref.read(apiServiceProvider).searchApi;
 
     try {
-      // Keep pulling pages from the current top-priority status until it yields
-      // at least one new card or every status is exhausted.
-      while (_sourceIndex < _sources.length &&
-          merged.length == existing.length) {
+      while (_specIndex < _specs.length && merged.length == existing.length) {
+        final spec = _specs[_specIndex];
         final resp = await search.searchAssets(
           MetadataSearchDto(
-            sortStatus: _sources[_sourceIndex],
+            sortStatus: spec.status,
+            albumIds: spec.albumId != null ? [spec.albumId!] : const [],
+            isNotInAlbum: spec.noAlbum ? true : null,
             page: _page,
             size: _pageSize,
             withDeleted: false,
@@ -99,14 +126,14 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
           ),
         );
         if (resp == null) {
-          _advanceSource();
+          _advanceSpec();
           continue;
         }
         for (final asset in resp.assets.items) {
           if (seen.add(asset.id)) merged.add(asset);
         }
         if (resp.assets.nextPage == null) {
-          _advanceSource();
+          _advanceSpec();
         } else {
           _page += 1;
         }
@@ -119,12 +146,12 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     return SortQueueState(
       assets: merged,
       currentIndex: existing.isEmpty ? 0 : existing.length,
-      hasMore: _sourceIndex < _sources.length,
+      hasMore: _specIndex < _specs.length,
     );
   }
 
-  void _advanceSource() {
-    _sourceIndex += 1;
+  void _advanceSpec() {
+    _specIndex += 1;
     _page = 1;
   }
 
@@ -138,9 +165,6 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
 
     final next = s.currentIndex + 1;
 
-    // Transparently load the next batch when running low, and always await a
-    // fetch before exposing a gap at the exact end of the loaded list — so the
-    // deck never flashes the "all caught up" view while more cards exist.
     if (s.hasMore &&
         (next >= s.assets.length ||
             (s.assets.length - next) < _loadMoreThreshold)) {
@@ -169,10 +193,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
     state = AsyncData(s.copyWith(currentIndex: s.currentIndex - 1));
   }
 
-  /// Reset the queue and reload from the first page of the highest-priority
-  /// status.
+  /// Reset the queue and reload from the first page of the highest-priority spec.
   Future<void> refresh() async {
-    _sourceIndex = 0;
+    _specIndex = 0;
     _page = 1;
     state = const AsyncLoading();
     state = AsyncData(await _fetchNextBatch(const []));

@@ -2,18 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:openapi/api.dart';
 
 class StorageBadge extends StatelessWidget {
-  const StorageBadge({super.key, required this.asset});
+  const StorageBadge({super.key, required this.asset, this.isLocal = false});
 
   final AssetResponseDto asset;
+
+  /// True when this photo also exists on the current device (matched locally).
+  final bool isLocal;
 
   @override
   Widget build(BuildContext context) {
     final isOffline = asset.isOffline;
-    final icon =
-        isOffline ? Icons.cloud_off_outlined : Icons.cloud_outlined;
-    final tooltip = isOffline
-        ? 'File not reachable on server'
-        : 'Stored in cloud – left-swipe sends to Immich trash';
+    final IconData icon;
+    final String tooltip;
+    if (isOffline) {
+      icon = Icons.cloud_off_outlined;
+      tooltip = 'File not reachable on server';
+    } else if (isLocal) {
+      icon = Icons.cloud_done_outlined;
+      tooltip = 'Stored in cloud and on this device';
+    } else {
+      icon = Icons.cloud_outlined;
+      tooltip = 'Stored in cloud – left-swipe sends to Immich trash';
+    }
 
     return Tooltip(
       message: tooltip,
