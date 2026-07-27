@@ -48,7 +48,7 @@ ready-to-merge PRs.
 
 ## On-disk relocation (2026-05)
 Moved from `C:\Users\basil\Swimmich-flutter\…` to:
-- Repo: `C:\Users\basil\dev\Swimmich Stack\Swimmich Mobile`
+- Repo: `C:\Users\basil\dev\Swimmich Stack\Swimmich app`
 - Flutter SDK: `C:\Users\basil\dev\dev tools\flutter`
 PATH and `mobile/android/local.properties` were updated to the new SDK path.
 
