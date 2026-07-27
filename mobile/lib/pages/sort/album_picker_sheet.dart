@@ -2,12 +2,12 @@ import 'dart:async' show Timer, unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/entities/album.entity.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
-import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
+import 'package:openapi/api.dart';
 
 /// Opens the full-search album picker. The user can select multiple albums
 /// without the sheet closing, then tap "Sort" to sort the current card into
@@ -40,7 +40,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   String? _createError;
   bool _isSorting = false;
 
-  List<Album>? _allAlbums;
+  List<AlbumResponseDto>? _allAlbums;
   bool _loading = true;
   String? _loadError;
 
@@ -64,7 +64,14 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
       _loadError = null;
     });
     try {
-      final albums = await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      // isOwned: true reproduces v2's `shared: null` ("all albums I own").
+      final albums = await ref
+          .read(apiServiceProvider)
+          .albumsApi
+          .getAllAlbums(isOwned: true);
+      if (albums == null) {
+        throw StateError('Album list request returned no body');
+      }
       if (mounted) {
         setState(() {
           _allAlbums = albums;
@@ -81,13 +88,12 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     }
   }
 
-  List<Album> get _filtered {
-    final all = _allAlbums ?? [];
+  List<AlbumResponseDto> get _filtered {
+    final all = _allAlbums ?? <AlbumResponseDto>[];
     return all
-        .where((a) => a.remoteId != null)
-        .where((a) => a.name.toLowerCase().contains(_filter.toLowerCase()))
+        .where((a) => a.albumName.toLowerCase().contains(_filter.toLowerCase()))
         .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+      ..sort((a, b) => a.albumName.compareTo(b.albumName));
   }
 
   void _onSearchChanged(String v) {
@@ -102,8 +108,8 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
 
-    final all = _allAlbums ?? [];
-    if (all.any((a) => a.name == trimmed)) {
+    final all = _allAlbums ?? <AlbumResponseDto>[];
+    if (all.any((a) => a.albumName == trimmed)) {
       setState(() => _createError = 'Album "$trimmed" already exists');
       return;
     }
@@ -115,11 +121,11 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
     try {
       final album = await ref
-          .read(albumApiRepositoryProvider)
-          .create(trimmed, assetIds: const []);
-      final remoteId = album.remoteId;
-      if (remoteId != null) {
-        ref.read(quickPickProvider.notifier).toggle(remoteId);
+          .read(remoteAlbumProvider.notifier)
+          .createAlbum(title: trimmed, assetIds: const []);
+      final newId = album?.id;
+      if (newId != null) {
+        ref.read(quickPickProvider.notifier).toggle(newId);
       }
       await _fetchAlbums();
       unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
@@ -265,7 +271,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
                         itemCount: _filtered.length,
                         itemBuilder: (_, i) {
                           final album = _filtered[i];
-                          final albumId = album.remoteId!;
+                          final albumId = album.id;
                           final isSelected = qp.selected.contains(albumId);
                           return ListTile(
                             leading: Icon(
@@ -274,7 +280,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
                                   ? Theme.of(context).colorScheme.primary
                                   : null,
                             ),
-                            title: Text(album.name),
+                            title: Text(album.albumName),
                             trailing: isSelected
                                 ? Icon(
                                     Icons.check,

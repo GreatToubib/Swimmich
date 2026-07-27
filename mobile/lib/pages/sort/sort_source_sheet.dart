@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/sort_filter.provider.dart';
-import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:openapi/api.dart';
 
 /// Opens the sort-source filter sheet. The deck shows photos whose triage
@@ -50,10 +50,16 @@ class _SortSourceSheetState extends ConsumerState<_SortSourceSheet> {
       _error = null;
     });
     try {
-      final all = await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      // isOwned: true reproduces v2's `shared: null` ("all albums I own").
+      final all = await ref
+          .read(apiServiceProvider)
+          .albumsApi
+          .getAllAlbums(isOwned: true);
+      if (all == null) {
+        throw StateError('Album list request returned no body');
+      }
       final albums = all
-          .where((a) => a.remoteId != null)
-          .map<_UserAlbum>((a) => (id: a.remoteId!, name: a.name))
+          .map<_UserAlbum>((a) => (id: a.id, name: a.albumName))
           .toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       if (mounted) {

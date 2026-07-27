@@ -22,10 +22,9 @@ import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
 import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
-import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
-import 'package:immich_mobile/widgets/common/immich_app_bar.dart';
+import 'package:immich_mobile/widgets/swimmich/sort_app_bar.dart';
 import 'package:openapi/api.dart';
 
 AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
@@ -41,11 +40,19 @@ AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
 /// kept alive and would otherwise never re-check.
 Future<void> _refreshAlbumsAndPrune(WidgetRef ref) async {
   unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
-  final albumApi = ref.read(albumApiRepositoryProvider);
+  final albumsApi = ref.read(apiServiceProvider).albumsApi;
   final quickPick = ref.read(quickPickProvider.notifier);
   try {
-    final albums = await albumApi.getAll(shared: null);
-    final ids = albums.map((a) => a.remoteId).whereType<String>().toSet();
+    // isOwned: true reproduces v2's `shared: null` ("all albums I own").
+    // v3's no-filter default would also return albums shared WITH me, which the
+    // user may not be able to file into.
+    final albums = await albumsApi.getAllAlbums(isOwned: true);
+    // A null body means we learned nothing — pruning against an empty set would
+    // silently wipe the user's pinned chips.
+    if (albums == null) {
+      return;
+    }
+    final ids = albums.map((a) => a.id).toSet();
     // Wait for the persisted pinned/recent state to load — on a cold start the
     // prune would otherwise run against the empty initial state and miss the
     // dead albums until the next tab switch.
@@ -117,7 +124,7 @@ class SortPage extends HookConsumerWidget {
     }, [caughtUp]);
 
     return Scaffold(
-      appBar: const ImmichAppBar(actions: [_SortFilterButton()]),
+      appBar: const SortAppBar(actions: [_SortFilterButton()]),
       backgroundColor: Colors.black,
       body: queueAsync.when(
         loading: () => const _LoadingView(),
