@@ -115,14 +115,17 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
         final spec = _specs[_specIndex];
         final resp = await search.searchAssets(
           MetadataSearchDto(
-            sortStatus: spec.status,
-            albumIds: spec.albumId != null ? [spec.albumId!] : const [],
-            isNotInAlbum: spec.noAlbum ? true : null,
-            page: _page,
-            size: _pageSize,
-            withDeleted: false,
+            sortStatus: Optional.present(spec.status),
+            albumIds: Optional.present(spec.albumId != null ? [spec.albumId!] : const []),
+            // Must stay absent (omitted) rather than an explicit null when the
+            // filter is off: v3's client serialises Optional.present(null) as
+            // JSON null, which is a different query from omitting the field.
+            isNotInAlbum: spec.noAlbum ? const Optional.present(true) : const Optional.absent(),
+            page: Optional.present(_page),
+            size: Optional.present(_pageSize),
+            withDeleted: const Optional.present(false),
             // EXIF carries the native star rating used to prefill the card.
-            withExif: true,
+            withExif: const Optional.present(true),
           ),
         );
         if (resp == null) {

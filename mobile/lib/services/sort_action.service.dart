@@ -3,8 +3,8 @@ import 'package:immich_mobile/infrastructure/repositories/remote_album.repositor
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
-import 'package:immich_mobile/repositories/album_api.repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
+import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:openapi/api.dart';
 
 enum SortAction { delete, reviewLater, sorted }
@@ -64,7 +64,7 @@ class SortActionService {
   );
 
   final AssetApiRepository _assetRepo;
-  final AlbumApiRepository _albumRepo;
+  final DriftAlbumApiRepository _albumRepo;
   final DriftRemoteAlbumRepository _driftAlbumRepo;
   final RemoteAssetRepository _driftAssetRepo;
 
@@ -191,7 +191,7 @@ class SortActionService {
 final sortActionServiceProvider = Provider<SortActionService>(
   (ref) => SortActionService(
     ref.watch(assetApiRepositoryProvider),
-    ref.watch(albumApiRepositoryProvider),
+    ref.watch(driftAlbumApiRepositoryProvider),
     ref.watch(remoteAlbumRepository),
     ref.watch(remoteAssetRepositoryProvider),
   ),

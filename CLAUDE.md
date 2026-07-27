@@ -9,9 +9,16 @@ release recap. This file is the operational "house rules."
 - Solo developer. Goal loop: branch → build to phone → ready-to-merge PR.
 
 ## Locations (paths contain spaces — always quote them)
-- **Repo root:** `C:\Users\basil\dev\Swimmich Stack\Swimmich Mobile`
+- **Repo root:** `C:\Users\basil\dev\Swimmich Stack\Swimmich app`
 - **Flutter app:** `mobile/`
-- **Flutter SDK:** `C:\Users\basil\dev\dev tools\flutter` (call `…\flutter\bin\flutter.bat`)
+- **Flutter SDK:** `C:\Users\basil\dev\dev-tools\flutter` (call `…\flutter\bin\flutter.bat`)
+  - Pinned to **exactly 3.44.1** (detached tag checkout, so `flutter --version`
+    reports channel `[user-branch]`). `mobile/pubspec.yaml` pins `flutter: 3.44.1`
+    as an exact match — 3.44.8 is rejected. Do not run `flutter upgrade`.
+  - The folder was renamed from `dev tools` → `dev-tools` on 2026-07-27: the space
+    broke Dart's native-assets build hooks (the hook runner invokes `dart.exe`
+    unquoted, splitting the path), which blocked i18n codegen and `build_runner`.
+    A directory junction does **not** work around it — Dart resolves the real path.
 
 ## Branching & GitHub
 - Branch from **`swimmich-test`** (the integration branch) — **never** `main`.
@@ -39,11 +46,28 @@ release recap. This file is the operational "house rules."
 - Distribute via **Firebase App Distribution**, project `swimmich-afe59` (free Spark plan).
 
 ## Known gotchas
-- `androidx.glance` is pinned to `1.1.1` in `mobile/android/app/build.gradle`
-  (the `1.+` dynamic version pulled an alpha needing compileSdk 37).
+- `androidx.glance`: the fork's manual `resolutionStrategy` pin was **removed** in
+  the v3 migration — upstream now enforces the identical 1.1.1 via a `strictly`
+  constraint in `build.gradle` + `gradle/libs.versions.toml`. Don't re-add it.
+- The v3 Dart client is generated with `useOptional=true`, so every optional DTO
+  field is `Optional<T>`, not a bare nullable. Two traps: `x != null` on an
+  `Optional` is **always true** (analyzer says warning, not error), and
+  `Optional.present(null)` serialises as explicit JSON `null` — which is a
+  different request from omitting the field. Use `Optional.absent()` to omit.
+- Asset `rating`: v3 rejects `0` (must be -1, 1-5, or null). Swimmich uses 0 for
+  "unrated", so `setSortStatus` maps 0 → null.
 - Immich metadata search **ANDs** `albumIds` (intersection, not OR) — to load a
   union across albums, query each album separately and merge/dedupe.
 
 ## Servers
 - Local dev: Docker Desktop, then `cd ~/immich-app && docker compose up -d`.
-- Production: OVH VPS via `ssh ovh` (141.94.77.202) — Swimmich not yet deployed there.
+- **Deployed on the OVH VPS (141.94.77.202) since 2026-05** — two stacks, both live:
+  | Env  | Branch          | URL                                      | Port |
+  |------|-----------------|------------------------------------------|------|
+  | prod | `swimmich`      | https://swimmich.azestysolution.com      | 2283 |
+  | test | `swimmich-test` | https://swimmich-test.azestysolution.com | 2284 |
+- Connect as **`ssh swimmich`** (unprivileged user `basil`). `ssh ovh` is root
+  break-glass — don't use it without asking.
+- Images build in GitHub Actions → `ghcr.io/greattoubib/swimmich-server`; the VPS
+  only pulls. test auto-deploys on push; prod is manual via `~/swimmich/deploy.sh prod`.
+- Full deploy/CI/Caddy runbook: `..\CLAUDE.md` (the `Swimmich Stack` root).

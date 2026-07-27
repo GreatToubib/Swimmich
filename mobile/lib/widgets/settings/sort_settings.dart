@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:immich_mobile/entities/album.entity.dart';
+import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_settings.provider.dart';
-import 'package:immich_mobile/repositories/album_api.repository.dart';
+import 'package:openapi/api.dart';
 
 /// Settings widget for configuring the 3 pinned quick-pick album slots.
 class SortSettings extends ConsumerWidget {
@@ -115,7 +115,7 @@ class _AlbumPickerSheet extends ConsumerStatefulWidget {
 }
 
 class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
-  List<Album>? _albums;
+  List<AlbumResponseDto>? _albums;
   bool _loading = true;
   String? _error;
 
@@ -127,13 +127,18 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
   Future<void> _load() async {
     try {
-      final all = await ref.read(albumApiRepositoryProvider).getAll(shared: null);
+      // isOwned: true reproduces v2's `shared: null` ("all albums I own").
+      final all = await ref
+          .read(apiServiceProvider)
+          .albumsApi
+          .getAllAlbums(isOwned: true);
+      if (all == null) {
+        throw StateError('Album list request returned no body');
+      }
       if (mounted) {
         setState(() {
-          _albums = all
-              .where((a) => a.remoteId != null)
-              .toList()
-            ..sort((a, b) => a.name.compareTo(b.name));
+          _albums = all.toList()
+            ..sort((a, b) => a.albumName.compareTo(b.albumName));
           _loading = false;
         });
       }
@@ -196,9 +201,9 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
                         itemCount: _albums!.length,
                         itemBuilder: (_, i) {
                           final album = _albums![i];
-                          // Use remoteId as the pinned slot value so
+                          // Use the server album id as the pinned slot value so
                           // quickPickProvider can match against API album IDs.
-                          final id = album.remoteId!;
+                          final id = album.id;
                           final isCurrent = id == widget.currentId;
                           return ListTile(
                             leading: Icon(
@@ -207,7 +212,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
                                   ? Theme.of(context).colorScheme.primary
                                   : null,
                             ),
-                            title: Text(album.name),
+                            title: Text(album.albumName),
                             trailing: isCurrent
                                 ? Icon(
                                     Icons.check,
