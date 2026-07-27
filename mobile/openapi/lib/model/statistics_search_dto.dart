@@ -31,6 +31,7 @@ class StatisticsSearchDto {
     this.ocr = const Optional.absent(),
     this.personIds = const Optional.present(const []),
     this.rating = const Optional.absent(),
+    this.sortStatus = const Optional.absent(),
     this.state = const Optional.absent(),
     this.tagIds = const Optional.present(const []),
     this.takenAfter = const Optional.absent(),
@@ -154,6 +155,14 @@ class StatisticsSearchDto {
   /// Maximum value: 5
   Optional<int?> rating;
 
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<SortStatus?> sortStatus;
+
   /// Filter by state/province name
   Optional<String?> state;
 
@@ -250,6 +259,7 @@ class StatisticsSearchDto {
     other.ocr == ocr &&
     _deepEquality.equals(other.personIds, personIds) &&
     other.rating == rating &&
+    other.sortStatus == sortStatus &&
     other.state == state &&
     _deepEquality.equals(other.tagIds, tagIds) &&
     other.takenAfter == takenAfter &&
@@ -282,6 +292,7 @@ class StatisticsSearchDto {
     (ocr == null ? 0 : ocr!.hashCode) +
     (personIds.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (state == null ? 0 : state!.hashCode) +
     (tagIds == null ? 0 : tagIds!.hashCode) +
     (takenAfter == null ? 0 : takenAfter!.hashCode) +
@@ -294,7 +305,7 @@ class StatisticsSearchDto {
     (visibility == null ? 0 : visibility!.hashCode);
 
   @override
-  String toString() => 'StatisticsSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, description=$description, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, personIds=$personIds, rating=$rating, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility]';
+  String toString() => 'StatisticsSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, description=$description, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, personIds=$personIds, rating=$rating, sortStatus=$sortStatus, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -373,6 +384,10 @@ class StatisticsSearchDto {
     if (this.rating.isPresent) {
       final value = this.rating.value;
       json[r'rating'] = value;
+    }
+    if (this.sortStatus.isPresent) {
+      final value = this.sortStatus.value;
+      json[r'sortStatus'] = value;
     }
     if (this.state.isPresent) {
       final value = this.state.value;
@@ -460,6 +475,7 @@ class StatisticsSearchDto {
             ? (json[r'personIds'] as Iterable).cast<String>().toList(growable: false)
             : const []) : const Optional.absent(),
         rating: json.containsKey(r'rating') ? Optional.present(json[r'rating'] == null ? null : int.parse('${json[r'rating']}')) : const Optional.absent(),
+        sortStatus: json.containsKey(r'sortStatus') ? Optional.present(SortStatus.fromJson(json[r'sortStatus'])) : const Optional.absent(),
         state: json.containsKey(r'state') ? Optional.present(mapValueOfType<String>(json, r'state')) : const Optional.absent(),
         tagIds: json.containsKey(r'tagIds') ? Optional.present(json[r'tagIds'] is Iterable
             ? (json[r'tagIds'] as Iterable).cast<String>().toList(growable: false)

@@ -40,6 +40,7 @@ class MetadataSearchDto {
     this.previewPath = const Optional.absent(),
     this.rating = const Optional.absent(),
     this.size = const Optional.absent(),
+    this.sortStatus = const Optional.absent(),
     this.state = const Optional.absent(),
     this.tagIds = const Optional.present(const []),
     this.takenAfter = const Optional.absent(),
@@ -254,6 +255,14 @@ class MetadataSearchDto {
   ///
   Optional<int?> size;
 
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<SortStatus?> sortStatus;
+
   /// Filter by state/province name
   Optional<String?> state;
 
@@ -404,6 +413,7 @@ class MetadataSearchDto {
     other.previewPath == previewPath &&
     other.rating == rating &&
     other.size == size &&
+    other.sortStatus == sortStatus &&
     other.state == state &&
     _deepEquality.equals(other.tagIds, tagIds) &&
     other.takenAfter == takenAfter &&
@@ -450,6 +460,7 @@ class MetadataSearchDto {
     (previewPath == null ? 0 : previewPath!.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
     (size == null ? 0 : size!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (state == null ? 0 : state!.hashCode) +
     (tagIds == null ? 0 : tagIds!.hashCode) +
     (takenAfter == null ? 0 : takenAfter!.hashCode) +
@@ -467,7 +478,7 @@ class MetadataSearchDto {
     (withStacked == null ? 0 : withStacked!.hashCode);
 
   @override
-  String toString() => 'MetadataSearchDto[albumIds=$albumIds, checksum=$checksum, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, description=$description, encodedVideoPath=$encodedVideoPath, id=$id, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, order=$order, originalFileName=$originalFileName, originalPath=$originalPath, page=$page, personIds=$personIds, previewPath=$previewPath, rating=$rating, size=$size, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, thumbnailPath=$thumbnailPath, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withPeople=$withPeople, withStacked=$withStacked]';
+  String toString() => 'MetadataSearchDto[albumIds=$albumIds, checksum=$checksum, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, description=$description, encodedVideoPath=$encodedVideoPath, id=$id, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, order=$order, originalFileName=$originalFileName, originalPath=$originalPath, page=$page, personIds=$personIds, previewPath=$previewPath, rating=$rating, size=$size, sortStatus=$sortStatus, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, thumbnailPath=$thumbnailPath, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif, withPeople=$withPeople, withStacked=$withStacked]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -582,6 +593,10 @@ class MetadataSearchDto {
     if (this.size.isPresent) {
       final value = this.size.value;
       json[r'size'] = value;
+    }
+    if (this.sortStatus.isPresent) {
+      final value = this.sortStatus.value;
+      json[r'sortStatus'] = value;
     }
     if (this.state.isPresent) {
       final value = this.state.value;
@@ -698,6 +713,7 @@ class MetadataSearchDto {
         previewPath: json.containsKey(r'previewPath') ? Optional.present(mapValueOfType<String>(json, r'previewPath')) : const Optional.absent(),
         rating: json.containsKey(r'rating') ? Optional.present(json[r'rating'] == null ? null : int.parse('${json[r'rating']}')) : const Optional.absent(),
         size: json.containsKey(r'size') ? Optional.present(json[r'size'] == null ? null : int.parse('${json[r'size']}')) : const Optional.absent(),
+        sortStatus: json.containsKey(r'sortStatus') ? Optional.present(SortStatus.fromJson(json[r'sortStatus'])) : const Optional.absent(),
         state: json.containsKey(r'state') ? Optional.present(mapValueOfType<String>(json, r'state')) : const Optional.absent(),
         tagIds: json.containsKey(r'tagIds') ? Optional.present(json[r'tagIds'] is Iterable
             ? (json[r'tagIds'] as Iterable).cast<String>().toList(growable: false)

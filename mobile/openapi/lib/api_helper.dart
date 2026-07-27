@@ -178,6 +178,9 @@ String parameterToString(dynamic value) {
   if (value is SharedLinkType) {
     return SharedLinkTypeTypeTransformer().encode(value).toString();
   }
+  if (value is SortStatus) {
+    return SortStatusTypeTransformer().encode(value).toString();
+  }
   if (value is SourceType) {
     return SourceTypeTypeTransformer().encode(value).toString();
   }

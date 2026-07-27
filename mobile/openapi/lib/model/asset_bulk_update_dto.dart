@@ -22,6 +22,7 @@ class AssetBulkUpdateDto {
     this.latitude = const Optional.absent(),
     this.longitude = const Optional.absent(),
     this.rating = const Optional.absent(),
+    this.sortStatus = const Optional.absent(),
     this.timeZone = const Optional.absent(),
     this.visibility = const Optional.absent(),
   });
@@ -101,6 +102,14 @@ class AssetBulkUpdateDto {
   /// Maximum value: 5
   Optional<int?> rating;
 
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<SortStatus?> sortStatus;
+
   /// Time zone (IANA timezone)
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
@@ -129,6 +138,7 @@ class AssetBulkUpdateDto {
     other.latitude == latitude &&
     other.longitude == longitude &&
     other.rating == rating &&
+    other.sortStatus == sortStatus &&
     other.timeZone == timeZone &&
     other.visibility == visibility;
 
@@ -144,11 +154,12 @@ class AssetBulkUpdateDto {
     (latitude == null ? 0 : latitude!.hashCode) +
     (longitude == null ? 0 : longitude!.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (timeZone == null ? 0 : timeZone!.hashCode) +
     (visibility == null ? 0 : visibility!.hashCode);
 
   @override
-  String toString() => 'AssetBulkUpdateDto[dateTimeOriginal=$dateTimeOriginal, dateTimeRelative=$dateTimeRelative, description=$description, duplicateId=$duplicateId, ids=$ids, isFavorite=$isFavorite, latitude=$latitude, longitude=$longitude, rating=$rating, timeZone=$timeZone, visibility=$visibility]';
+  String toString() => 'AssetBulkUpdateDto[dateTimeOriginal=$dateTimeOriginal, dateTimeRelative=$dateTimeRelative, description=$description, duplicateId=$duplicateId, ids=$ids, isFavorite=$isFavorite, latitude=$latitude, longitude=$longitude, rating=$rating, sortStatus=$sortStatus, timeZone=$timeZone, visibility=$visibility]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -185,6 +196,10 @@ class AssetBulkUpdateDto {
       final value = this.rating.value;
       json[r'rating'] = value;
     }
+    if (this.sortStatus.isPresent) {
+      final value = this.sortStatus.value;
+      json[r'sortStatus'] = value;
+    }
     if (this.timeZone.isPresent) {
       final value = this.timeZone.value;
       json[r'timeZone'] = value;
@@ -216,6 +231,7 @@ class AssetBulkUpdateDto {
         latitude: json.containsKey(r'latitude') ? Optional.present(json[r'latitude'] == null ? null : num.parse('${json[r'latitude']}')) : const Optional.absent(),
         longitude: json.containsKey(r'longitude') ? Optional.present(json[r'longitude'] == null ? null : num.parse('${json[r'longitude']}')) : const Optional.absent(),
         rating: json.containsKey(r'rating') ? Optional.present(json[r'rating'] == null ? null : int.parse('${json[r'rating']}')) : const Optional.absent(),
+        sortStatus: json.containsKey(r'sortStatus') ? Optional.present(SortStatus.fromJson(json[r'sortStatus'])) : const Optional.absent(),
         timeZone: json.containsKey(r'timeZone') ? Optional.present(mapValueOfType<String>(json, r'timeZone')) : const Optional.absent(),
         visibility: json.containsKey(r'visibility') ? Optional.present(AssetVisibility.fromJson(json[r'visibility'])) : const Optional.absent(),
       );

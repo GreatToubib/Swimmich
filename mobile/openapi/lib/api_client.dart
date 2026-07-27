@@ -661,6 +661,8 @@ class ApiClient {
           return SignUpDto.fromJson(value);
         case 'SmartSearchDto':
           return SmartSearchDto.fromJson(value);
+        case 'SortStatus':
+          return SortStatusTypeTransformer().decode(value);
         case 'SourceType':
           return SourceTypeTypeTransformer().decode(value);
         case 'StackCreateDto':

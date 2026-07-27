@@ -430,6 +430,9 @@ class SearchApi {
   /// * [int] size:
   ///   Number of results to return
   ///
+  /// * [SortStatus] sortStatus:
+  ///   Filter by Swimmich sort status
+  ///
   /// * [String] state:
   ///   Filter by state/province name
   ///
@@ -463,7 +466,7 @@ class SearchApi {
   ///
   /// * [bool] withExif:
   ///   Include EXIF data in response
-  Future<Response> searchLargeAssetsWithHttpInfo({ List<String>? albumIds, String? city, String? country, DateTime? createdAfter, DateTime? createdBefore, bool? isEncoded, bool? isFavorite, bool? isMotion, bool? isNotInAlbum, bool? isOffline, String? lensModel, String? libraryId, String? make, int? minFileSize, String? model, String? ocr, List<String>? personIds, int? rating, int? size, String? state, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, DateTime? trashedAfter, DateTime? trashedBefore, AssetTypeEnum? type, DateTime? updatedAfter, DateTime? updatedBefore, AssetVisibility? visibility, bool? withDeleted, bool? withExif, Future<void>? abortTrigger, }) async {
+  Future<Response> searchLargeAssetsWithHttpInfo({ List<String>? albumIds, String? city, String? country, DateTime? createdAfter, DateTime? createdBefore, bool? isEncoded, bool? isFavorite, bool? isMotion, bool? isNotInAlbum, bool? isOffline, String? lensModel, String? libraryId, String? make, int? minFileSize, String? model, String? ocr, List<String>? personIds, int? rating, int? size, SortStatus? sortStatus, String? state, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, DateTime? trashedAfter, DateTime? trashedBefore, AssetTypeEnum? type, DateTime? updatedAfter, DateTime? updatedBefore, AssetVisibility? visibility, bool? withDeleted, bool? withExif, Future<void>? abortTrigger, }) async {
     // ignore: prefer_const_declarations
     final apiPath = r'/search/large-assets';
 
@@ -530,6 +533,9 @@ class SearchApi {
     }
     if (size != null) {
       queryParams.addAll(_queryParams('', 'size', size));
+    }
+    if (sortStatus != null) {
+      queryParams.addAll(_queryParams('', 'sortStatus', sortStatus));
     }
     if (state != null) {
       queryParams.addAll(_queryParams('', 'state', state));
@@ -646,6 +652,9 @@ class SearchApi {
   /// * [int] size:
   ///   Number of results to return
   ///
+  /// * [SortStatus] sortStatus:
+  ///   Filter by Swimmich sort status
+  ///
   /// * [String] state:
   ///   Filter by state/province name
   ///
@@ -679,8 +688,8 @@ class SearchApi {
   ///
   /// * [bool] withExif:
   ///   Include EXIF data in response
-  Future<List<AssetResponseDto>?> searchLargeAssets({ List<String>? albumIds, String? city, String? country, DateTime? createdAfter, DateTime? createdBefore, bool? isEncoded, bool? isFavorite, bool? isMotion, bool? isNotInAlbum, bool? isOffline, String? lensModel, String? libraryId, String? make, int? minFileSize, String? model, String? ocr, List<String>? personIds, int? rating, int? size, String? state, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, DateTime? trashedAfter, DateTime? trashedBefore, AssetTypeEnum? type, DateTime? updatedAfter, DateTime? updatedBefore, AssetVisibility? visibility, bool? withDeleted, bool? withExif, Future<void>? abortTrigger, }) async {
-    final response = await searchLargeAssetsWithHttpInfo(albumIds: albumIds, city: city, country: country, createdAfter: createdAfter, createdBefore: createdBefore, isEncoded: isEncoded, isFavorite: isFavorite, isMotion: isMotion, isNotInAlbum: isNotInAlbum, isOffline: isOffline, lensModel: lensModel, libraryId: libraryId, make: make, minFileSize: minFileSize, model: model, ocr: ocr, personIds: personIds, rating: rating, size: size, state: state, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, trashedAfter: trashedAfter, trashedBefore: trashedBefore, type: type, updatedAfter: updatedAfter, updatedBefore: updatedBefore, visibility: visibility, withDeleted: withDeleted, withExif: withExif, abortTrigger: abortTrigger,);
+  Future<List<AssetResponseDto>?> searchLargeAssets({ List<String>? albumIds, String? city, String? country, DateTime? createdAfter, DateTime? createdBefore, bool? isEncoded, bool? isFavorite, bool? isMotion, bool? isNotInAlbum, bool? isOffline, String? lensModel, String? libraryId, String? make, int? minFileSize, String? model, String? ocr, List<String>? personIds, int? rating, int? size, SortStatus? sortStatus, String? state, List<String>? tagIds, DateTime? takenAfter, DateTime? takenBefore, DateTime? trashedAfter, DateTime? trashedBefore, AssetTypeEnum? type, DateTime? updatedAfter, DateTime? updatedBefore, AssetVisibility? visibility, bool? withDeleted, bool? withExif, Future<void>? abortTrigger, }) async {
+    final response = await searchLargeAssetsWithHttpInfo(albumIds: albumIds, city: city, country: country, createdAfter: createdAfter, createdBefore: createdBefore, isEncoded: isEncoded, isFavorite: isFavorite, isMotion: isMotion, isNotInAlbum: isNotInAlbum, isOffline: isOffline, lensModel: lensModel, libraryId: libraryId, make: make, minFileSize: minFileSize, model: model, ocr: ocr, personIds: personIds, rating: rating, size: size, sortStatus: sortStatus, state: state, tagIds: tagIds, takenAfter: takenAfter, takenBefore: takenBefore, trashedAfter: trashedAfter, trashedBefore: trashedBefore, type: type, updatedAfter: updatedAfter, updatedBefore: updatedBefore, visibility: visibility, withDeleted: withDeleted, withExif: withExif, abortTrigger: abortTrigger,);
     if (response.statusCode >= HttpStatus.badRequest) {
       throw ApiException(response.statusCode, await _decodeBodyBytes(response));
     }

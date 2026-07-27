@@ -16972,12 +16972,7 @@
             "x-immich-state": "Stable"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
-            "description": "Swimmich sort/triage status"
+            "$ref": "#/components/schemas/SortStatus"
           },
           "timeZone": {
             "description": "Time zone (IANA timezone)",
@@ -18010,12 +18005,7 @@
             "x-immich-state": "Deprecated"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
-            "description": "Swimmich sort/triage status"
+            "$ref": "#/components/schemas/SortStatus"
           },
           "stack": {
             "allOf": [
@@ -20236,11 +20226,7 @@
             "type": "integer"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/SortStatus",
             "description": "Filter by Swimmich sort status"
           },
           "state": {
@@ -21935,11 +21921,7 @@
             "type": "integer"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/SortStatus",
             "description": "Filter by Swimmich sort status"
           },
           "state": {
@@ -23443,11 +23425,7 @@
             "type": "integer"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/SortStatus",
             "description": "Filter by Swimmich sort status"
           },
           "state": {
@@ -23723,11 +23701,7 @@
             "x-immich-state": "Stable"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/SortStatus",
             "description": "Filter by Swimmich sort status"
           },
           "state": {
@@ -27243,12 +27217,7 @@
             "x-immich-state": "Stable"
           },
           "sortStatus": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/SortStatus"
-              }
-            ],
-            "description": "Swimmich sort/triage status"
+            "$ref": "#/components/schemas/SortStatus"
           },
           "visibility": {
             "$ref": "#/components/schemas/AssetVisibility"

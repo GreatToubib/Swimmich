@@ -35,6 +35,7 @@ class SmartSearchDto {
     this.queryAssetId = const Optional.absent(),
     this.rating = const Optional.absent(),
     this.size = const Optional.absent(),
+    this.sortStatus = const Optional.absent(),
     this.state = const Optional.absent(),
     this.tagIds = const Optional.present(const []),
     this.takenAfter = const Optional.absent(),
@@ -202,6 +203,14 @@ class SmartSearchDto {
   ///
   Optional<int?> size;
 
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
+  Optional<SortStatus?> sortStatus;
+
   /// Filter by state/province name
   Optional<String?> state;
 
@@ -320,6 +329,7 @@ class SmartSearchDto {
     other.queryAssetId == queryAssetId &&
     other.rating == rating &&
     other.size == size &&
+    other.sortStatus == sortStatus &&
     other.state == state &&
     _deepEquality.equals(other.tagIds, tagIds) &&
     other.takenAfter == takenAfter &&
@@ -358,6 +368,7 @@ class SmartSearchDto {
     (queryAssetId == null ? 0 : queryAssetId!.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
     (size == null ? 0 : size!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (state == null ? 0 : state!.hashCode) +
     (tagIds == null ? 0 : tagIds!.hashCode) +
     (takenAfter == null ? 0 : takenAfter!.hashCode) +
@@ -372,7 +383,7 @@ class SmartSearchDto {
     (withExif == null ? 0 : withExif!.hashCode);
 
   @override
-  String toString() => 'SmartSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, language=$language, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, page=$page, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, size=$size, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif]';
+  String toString() => 'SmartSearchDto[albumIds=$albumIds, city=$city, country=$country, createdAfter=$createdAfter, createdBefore=$createdBefore, isEncoded=$isEncoded, isFavorite=$isFavorite, isMotion=$isMotion, isNotInAlbum=$isNotInAlbum, isOffline=$isOffline, language=$language, lensModel=$lensModel, libraryId=$libraryId, make=$make, model=$model, ocr=$ocr, page=$page, personIds=$personIds, query=$query, queryAssetId=$queryAssetId, rating=$rating, size=$size, sortStatus=$sortStatus, state=$state, tagIds=$tagIds, takenAfter=$takenAfter, takenBefore=$takenBefore, trashedAfter=$trashedAfter, trashedBefore=$trashedBefore, type=$type, updatedAfter=$updatedAfter, updatedBefore=$updatedBefore, visibility=$visibility, withDeleted=$withDeleted, withExif=$withExif]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -467,6 +478,10 @@ class SmartSearchDto {
     if (this.size.isPresent) {
       final value = this.size.value;
       json[r'size'] = value;
+    }
+    if (this.sortStatus.isPresent) {
+      final value = this.sortStatus.value;
+      json[r'sortStatus'] = value;
     }
     if (this.state.isPresent) {
       final value = this.state.value;
@@ -566,6 +581,7 @@ class SmartSearchDto {
         queryAssetId: json.containsKey(r'queryAssetId') ? Optional.present(mapValueOfType<String>(json, r'queryAssetId')) : const Optional.absent(),
         rating: json.containsKey(r'rating') ? Optional.present(json[r'rating'] == null ? null : int.parse('${json[r'rating']}')) : const Optional.absent(),
         size: json.containsKey(r'size') ? Optional.present(json[r'size'] == null ? null : int.parse('${json[r'size']}')) : const Optional.absent(),
+        sortStatus: json.containsKey(r'sortStatus') ? Optional.present(SortStatus.fromJson(json[r'sortStatus'])) : const Optional.absent(),
         state: json.containsKey(r'state') ? Optional.present(mapValueOfType<String>(json, r'state')) : const Optional.absent(),
         tagIds: json.containsKey(r'tagIds') ? Optional.present(json[r'tagIds'] is Iterable
             ? (json[r'tagIds'] as Iterable).cast<String>().toList(growable: false)

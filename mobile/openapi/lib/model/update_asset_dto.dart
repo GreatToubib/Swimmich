@@ -20,6 +20,7 @@ class UpdateAssetDto {
     this.livePhotoVideoId = const Optional.absent(),
     this.longitude = const Optional.absent(),
     this.rating = const Optional.absent(),
+    this.sortStatus = const Optional.absent(),
     this.visibility = const Optional.absent(),
   });
 
@@ -89,6 +90,14 @@ class UpdateAssetDto {
   /// source code must fall back to having a nullable type.
   /// Consider adding a "default:" property in the specification file to hide this note.
   ///
+  Optional<SortStatus?> sortStatus;
+
+  ///
+  /// Please note: This property should have been non-nullable! Since the specification file
+  /// does not include a default value (using the "default:" property), however, the generated
+  /// source code must fall back to having a nullable type.
+  /// Consider adding a "default:" property in the specification file to hide this note.
+  ///
   Optional<AssetVisibility?> visibility;
 
   @override
@@ -100,6 +109,7 @@ class UpdateAssetDto {
     other.livePhotoVideoId == livePhotoVideoId &&
     other.longitude == longitude &&
     other.rating == rating &&
+    other.sortStatus == sortStatus &&
     other.visibility == visibility;
 
   @override
@@ -112,10 +122,11 @@ class UpdateAssetDto {
     (livePhotoVideoId == null ? 0 : livePhotoVideoId!.hashCode) +
     (longitude == null ? 0 : longitude!.hashCode) +
     (rating == null ? 0 : rating!.hashCode) +
+    (sortStatus == null ? 0 : sortStatus!.hashCode) +
     (visibility == null ? 0 : visibility!.hashCode);
 
   @override
-  String toString() => 'UpdateAssetDto[dateTimeOriginal=$dateTimeOriginal, description=$description, isFavorite=$isFavorite, latitude=$latitude, livePhotoVideoId=$livePhotoVideoId, longitude=$longitude, rating=$rating, visibility=$visibility]';
+  String toString() => 'UpdateAssetDto[dateTimeOriginal=$dateTimeOriginal, description=$description, isFavorite=$isFavorite, latitude=$latitude, livePhotoVideoId=$livePhotoVideoId, longitude=$longitude, rating=$rating, sortStatus=$sortStatus, visibility=$visibility]';
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
@@ -147,6 +158,10 @@ class UpdateAssetDto {
       final value = this.rating.value;
       json[r'rating'] = value;
     }
+    if (this.sortStatus.isPresent) {
+      final value = this.sortStatus.value;
+      json[r'sortStatus'] = value;
+    }
     if (this.visibility.isPresent) {
       final value = this.visibility.value;
       json[r'visibility'] = value;
@@ -170,6 +185,7 @@ class UpdateAssetDto {
         livePhotoVideoId: json.containsKey(r'livePhotoVideoId') ? Optional.present(mapValueOfType<String>(json, r'livePhotoVideoId')) : const Optional.absent(),
         longitude: json.containsKey(r'longitude') ? Optional.present(json[r'longitude'] == null ? null : num.parse('${json[r'longitude']}')) : const Optional.absent(),
         rating: json.containsKey(r'rating') ? Optional.present(json[r'rating'] == null ? null : int.parse('${json[r'rating']}')) : const Optional.absent(),
+        sortStatus: json.containsKey(r'sortStatus') ? Optional.present(SortStatus.fromJson(json[r'sortStatus'])) : const Optional.absent(),
         visibility: json.containsKey(r'visibility') ? Optional.present(AssetVisibility.fromJson(json[r'visibility'])) : const Optional.absent(),
       );
     }
