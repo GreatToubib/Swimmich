@@ -12,6 +12,38 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
+// Swimmich addition (not upstream).
+//
+// home_widget 0.8.1 declares no Kotlin jvmTarget, so it defaults to 1.8 while its
+// own dependencies are built for JVM 11, failing the release build with:
+//   "Cannot inline bytecode built with JVM target 11 into bytecode that is being
+//    built with JVM target 1.8. Specify proper '-jvm-target' option."
+//
+// This is scoped to that single module on purpose. Flutter plugins declare
+// genuinely mixed Java targets (1.8, 11 and 17), and Gradle requires Java and
+// Kotlin to agree *within* a module, so any repo-wide value simply moves the
+// failure from one plugin to another. Both sides are set here, since raising
+// only Kotlin would leave it disagreeing with home_widget's own Java 1.8.
+//
+// projectsEvaluated is the hook that works: the Android Gradle Plugin owns the
+// javac tasks and each plugin's build.gradle overwrites earlier configuration,
+// while afterEvaluate and jvmToolchain() both throw for projects that the
+// evaluationDependsOn(':app') above has already evaluated and finalised.
+gradle.projectsEvaluated {
+    def target = '11'
+    subprojects.findAll { it.name == 'home_widget' }.each { proj ->
+        proj.tasks.withType(JavaCompile).configureEach {
+            sourceCompatibility = target
+            targetCompatibility = target
+        }
+        proj.tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = target
+            }
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
