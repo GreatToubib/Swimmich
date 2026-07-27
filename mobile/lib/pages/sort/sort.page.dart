@@ -355,7 +355,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   void _resetAndPrefill() {
     final asset = widget.asset;
     // Native fields are already on the asset DTO — seed the UI synchronously.
-    final rating = asset.exifInfo?.rating?.toInt() ?? 0;
+    final rating = asset.exifInfo.orElse(null)?.rating.orElse(null) ?? 0;
     _originalStarRating = rating;
     _originalFavorite = asset.isFavorite;
     _originalSortStatus = asset.sortStatus;
@@ -655,7 +655,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
               assetId: widget.asset.id,
               thumbhash: widget.asset.thumbhash ?? '',
               assetType: _toAssetType(widget.asset.type),
-              isAnimated: widget.asset.livePhotoVideoId != null,
+              // `livePhotoVideoId` is an Optional in the v3 client, so a bare
+              // `!= null` would be unconditionally true and render every card as
+              // animated. The analyzer flags this only as a warning, not an error.
+              isAnimated: widget.asset.livePhotoVideoId.orElse(null) != null,
             ),
             fit: BoxFit.contain,
           ),

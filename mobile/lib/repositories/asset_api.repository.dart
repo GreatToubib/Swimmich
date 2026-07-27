@@ -108,9 +108,20 @@ class AssetApiRepository extends ApiRepository {
   }
 
   /// Sets the Swimmich triage status, optionally also writing the star [rating]
-  /// (0 clears the rating server-side) in the same request.
+  /// in the same request. Passing no [rating] leaves the stored rating untouched.
+  ///
+  /// Swimmich uses `0` for "unrated", but Immich v3 rejects `0` outright — a
+  /// rating must be -1 (rejected), 1-5 (starred), or null (unrated). So `0` is
+  /// sent as an explicit null, which is v3's way of clearing the rating. Sending
+  /// it verbatim would fail validation on nearly every "keep" action.
   Future<void> setSortStatus(String assetId, SortStatus status, {int? rating}) {
-    return _api.updateAsset(assetId, UpdateAssetDto(sortStatus: status, rating: rating));
+    return _api.updateAsset(
+      assetId,
+      UpdateAssetDto(
+        sortStatus: Optional.present(status),
+        rating: rating == null ? const Optional.absent() : Optional.present(rating == 0 ? null : rating),
+      ),
+    );
   }
 }
 
