@@ -3,10 +3,13 @@
 Context carry-over for new Claude sessions. For day-to-day rules see `CLAUDE.md`.
 
 ## What Swimmich is
-A personal **fork of Immich** (self-hosted photo manager), pinned to tag
-**v2.7.5**. It adds a Tinder-style **photo triage / "sort deck"** to the mobile
-app. Solo dev. Workflow: branch off `swimmich-test` → build to phone →
-ready-to-merge PRs.
+A personal **fork of Immich** (self-hosted photo manager), tracking tag
+**v3.0.3** (migrated from v2.7.5 on 2026-07-27). It adds a Tinder-style **photo
+triage / "sort deck"** to the mobile app. Solo dev. Workflow: branch off
+`swimmich-test` → build to phone → ready-to-merge PRs.
+
+Note the `swimmich-test` **branch** remains the integration branch even though
+the test *server* was decommissioned on 2026-07-28 to reclaim disk.
 
 - GitHub: `GreatToubib/Swimmich` (gh needs `--repo GreatToubib/Swimmich`).
 - Integration branch: **`swimmich-test`** (branch features from here, not `main`).

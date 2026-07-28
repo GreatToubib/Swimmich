@@ -4,7 +4,7 @@ Project instructions for Claude. Read `SWIMMICH.md` for the narrative project/
 release recap. This file is the operational "house rules."
 
 ## What this is
-- A personal **fork of [Immich](https://github.com/immich-app/immich)** (self-hosted photo manager), pinned to tag **v2.7.5**.
+- A personal **fork of [Immich](https://github.com/immich-app/immich)** (self-hosted photo manager), tracking tag **v3.0.3** (migrated from v2.7.5 on 2026-07-27).
 - Swimmich adds a Tinder-style **photo triage / "sort deck"** to the mobile app (`mobile/`).
 - Solo developer. Goal loop: branch → build to phone → ready-to-merge PR.
 
@@ -61,13 +61,19 @@ release recap. This file is the operational "house rules."
 
 ## Servers
 - Local dev: Docker Desktop, then `cd ~/immich-app && docker compose up -d`.
-- **Deployed on the OVH VPS (141.94.77.202) since 2026-05** — two stacks, both live:
-  | Env  | Branch          | URL                                      | Port |
-  |------|-----------------|------------------------------------------|------|
-  | prod | `swimmich`      | https://swimmich.azestysolution.com      | 2283 |
-  | test | `swimmich-test` | https://swimmich-test.azestysolution.com | 2284 |
+- **Deployed on the OVH VPS (141.94.77.202) since 2026-05** — **one live stack**:
+  | Env  | Branch     | URL                                 | Port |
+  |------|------------|-------------------------------------|------|
+  | prod | `swimmich` | https://swimmich.azestysolution.com | 2283 |
+- The **test stack was decommissioned 2026-07-28** to reclaim disk on the shared
+  VPS. `swimmich-test` is still the integration branch — keep branching from it
+  and opening PRs into it; only the *server* went away. CI still builds the
+  `:test` image, and the DNS record is kept, so it can be restored cheaply.
+  Restore steps are in `..\CLAUDE.md`.
 - Connect as **`ssh swimmich`** (unprivileged user `basil`). `ssh ovh` is root
   break-glass — don't use it without asking.
 - Images build in GitHub Actions → `ghcr.io/greattoubib/swimmich-server`; the VPS
-  only pulls. test auto-deploys on push; prod is manual via `~/swimmich/deploy.sh prod`.
+  only pulls. prod is manual via `~/swimmich/deploy.sh prod`.
+- Disk is tight — the box is **shared with junior**. Check `df -h /home/basil`
+  before anything that writes.
 - Full deploy/CI/Caddy runbook: `..\CLAUDE.md` (the `Swimmich Stack` root).
