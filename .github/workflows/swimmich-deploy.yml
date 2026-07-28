@@ -61,18 +61,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-test:
-    needs: build-and-push
-    if: github.ref_name == 'swimmich-test'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger test deploy over SSH
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
-          # The CI key is locked to a forced command; "deploy test" is the only
-          # accepted SSH_ORIGINAL_COMMAND on the server.
-          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
-            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "deploy test"
+  # ---------------------------------------------------------------------------
+  # deploy-test — DISABLED 2026-07-28.
+  #
+  # The test stack was decommissioned to reclaim disk on the shared VPS (see
+  # ../../CLAUDE.md, "Environments"). There is nothing at 127.0.0.1:2284 to
+  # deploy to, so this job would fail on every push to swimmich-test.
+  #
+  # Deliberately commented out rather than deleted: pushing to swimmich-test
+  # still builds and publishes the :test image above, so the image is ready
+  # whenever the environment is brought back.
+  #
+  # To restore: recreate ~/swimmich/test on the VPS, re-add the Caddy route for
+  # swimmich-test.azestysolution.com, then uncomment this job.
+  # ---------------------------------------------------------------------------
+  #
+  # deploy-test:
+  #   needs: build-and-push
+  #   if: github.ref_name == 'swimmich-test'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Trigger test deploy over SSH
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+  #         chmod 600 ~/.ssh/id_ed25519
+  #         ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+  #         # The CI key is locked to a forced command; "deploy test" is the only
+  #         # accepted SSH_ORIGINAL_COMMAND on the server.
+  #         ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+  #           "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" "deploy test"
