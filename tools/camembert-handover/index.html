@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
-<title>Camembert Handover</title>
+<title>File des camemberts</title>
 
 <style>
   :root {
@@ -27,7 +27,8 @@
     --on-paid:    #FFFFFF;
     --due:        #A93F2B;
     --due-soft:   #F6DFD8;
-    --ghost:      rgba(28,27,23,.16);
+    --late:       #96590C;
+    --late-soft:  #F7E7CE;
     --shadow-1:   0 1px 1px rgba(28,27,23,.05), 0 2px 6px rgba(28,27,23,.06);
     --shadow-2:   0 10px 30px rgba(28,27,23,.20), 0 2px 6px rgba(28,27,23,.12);
 
@@ -55,7 +56,8 @@
       --on-paid:   #12210F;
       --due:       #E08A6F;
       --due-soft:  #33201A;
-      --ghost:     rgba(240,235,222,.14);
+      --late:      #E3B072;
+      --late-soft: #33260F;
       --shadow-1:  0 1px 1px rgba(0,0,0,.30), 0 2px 6px rgba(0,0,0,.28);
       --shadow-2:  0 10px 30px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
     }
@@ -76,12 +78,16 @@
     --on-paid:   #12210F;
     --due:       #E08A6F;
     --due-soft:  #33201A;
-    --ghost:     rgba(240,235,222,.14);
+    --late:      #E3B072;
+    --late-soft: #33260F;
     --shadow-1:  0 1px 1px rgba(0,0,0,.30), 0 2px 6px rgba(0,0,0,.28);
     --shadow-2:  0 10px 30px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
   }
 
   * { box-sizing: border-box; }
+
+  /* sans ceci, un display: flex explicite l'emporte sur l'attribut hidden */
+  [hidden] { display: none !important; }
 
   body {
     margin: 0;
@@ -104,7 +110,7 @@
     flex-direction: column;
   }
 
-  /* ---------- masthead ---------- */
+  /* ---------- bandeau ---------- */
 
   .top {
     position: sticky;
@@ -131,8 +137,7 @@
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background:
-      conic-gradient(from 200deg, var(--gold) 0 46deg, transparent 46deg 360deg);
+    background: conic-gradient(from 200deg, var(--gold) 0 46deg, transparent 46deg 360deg);
     opacity: .55;
   }
 
@@ -176,11 +181,32 @@
     gap: 2px;
   }
   .tally b { font-size: 15px; font-weight: 700; }
-  .tally i { font-style: normal; color: var(--muted); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }
+  .tally i { font-style: normal; color: var(--muted); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
   .tally .t-paid b { color: var(--paid); }
   .tally .t-due  b { color: var(--due); }
 
-  /* ---------- settings ---------- */
+  .readonly-flag {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .readonly-flag b {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--rail);
+  }
+
+  /* ---------- réglages ---------- */
 
   .cfg-toggle {
     margin-top: 8px;
@@ -226,14 +252,14 @@
     min-width: 104px;
     text-align: center;
   }
-  .cfg-actions { display: flex; gap: 8px; }
-  .cfg-actions button { flex: 1; }
+  .cfg hr { border: 0; border-top: 1px solid var(--line); margin: 2px 0; }
+  .cfg-actions { display: grid; gap: 8px; }
 
-  /* ---------- board ---------- */
+  /* ---------- tableau ---------- */
 
   .board { flex: 1; padding: 8px var(--pad) 4px; }
 
-  .slot { display: grid; grid-template-columns: 58px 1fr; column-gap: 10px; }
+  .slot { display: grid; grid-template-columns: 62px 1fr; column-gap: 10px; }
 
   .rail { position: relative; padding-top: 2px; }
   .rail::before {
@@ -251,26 +277,28 @@
     font-size: 14px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -.01em;
+    letter-spacing: -.02em;
     color: var(--rail);
     text-align: center;
     padding: 3px 0 5px;
   }
 
-  .pips { display: flex; gap: 4px; justify-content: center; position: relative; }
+  .pips { display: flex; gap: 4px; justify-content: center; }
+  /* modificateurs préfixés : un nom nu comme .vacant hériterait des règles
+     du bloc de même nom et étirerait la pastille */
   .pip {
     width: 9px; height: 9px;
     border-radius: 50%;
     border: 1.5px solid var(--gold);
     background: var(--paper);
   }
-  .pip.full { background: var(--gold); }
-  .pip.done { background: var(--paid); border-color: var(--paid); }
-  .pip.empty { border-style: dashed; border-color: var(--line); }
+  .pip-full { background: var(--gold); }
+  .pip-done { background: var(--paid); border-color: var(--paid); }
+  .pip-free { border-style: dashed; border-color: var(--line); }
 
   .stack { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; }
 
-  /* ---------- card ---------- */
+  /* ---------- ligne ---------- */
 
   .card {
     display: grid;
@@ -284,8 +312,10 @@
     padding: 8px 8px 8px 0;
     min-height: 56px;
   }
-  /* dashed edges mean "nothing here yet" (free seat / drop target) — a handed-over
-     line is solid, just quieted and struck through */
+  .card.ro { grid-template-columns: 1fr auto; padding-left: 12px; }
+
+  /* les pointillés veulent dire « rien ici » (place libre, cible de dépôt) :
+     une ligne remise reste pleine, simplement estompée */
   .card.is-done { background: var(--surface-2); box-shadow: none; }
   .card.is-done .name { text-decoration: line-through; color: var(--muted); }
   .card.is-done .chip { opacity: .75; }
@@ -306,29 +336,25 @@
   .grip:active { cursor: grabbing; background: var(--surface-2); }
   .grip svg { display: block; }
 
-  .body {
+  .content { min-width: 0; display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
+
+  .name {
     background: none;
     border: 0;
-    padding: 2px 0;
+    padding: 0;
     text-align: left;
     font: inherit;
     color: inherit;
-    cursor: pointer;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .name {
     font-size: 16px;
     font-weight: 600;
     letter-spacing: -.005em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: pointer;
   }
   .name.untitled { color: var(--muted); font-weight: 400; font-style: italic; }
+  .card.ro .name { cursor: default; }
 
   .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
@@ -341,12 +367,19 @@
     border-radius: 999px;
     border: 1px solid transparent;
     white-space: nowrap;
+    background: none;
   }
+  button.chip { cursor: pointer; }
   .chip-paid { background: var(--paid-soft); color: var(--paid); border-color: var(--paid); }
   .chip-due  { background: var(--due-soft);  color: var(--due);  border-color: var(--due); }
-  .chip-note { color: var(--muted); border-color: var(--line); background: var(--surface-2);
-               text-transform: none; letter-spacing: .01em; font-family: var(--sans); font-size: 11px;
-               overflow: hidden; text-overflow: ellipsis; max-width: 14ch; }
+  /* pas de majuscules : « 21h30 » doit garder son h minuscule */
+  .chip-wish { background: var(--surface-2); color: var(--muted); border-color: var(--line); text-transform: none; letter-spacing: .02em; }
+  .chip-wish.late { background: var(--late-soft); color: var(--late); border-color: var(--late); }
+  .chip-note {
+    color: var(--muted); border-color: var(--line); background: var(--surface-2);
+    text-transform: none; letter-spacing: .01em; font-family: var(--sans); font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; max-width: 14ch;
+  }
 
   .check {
     flex: none;
@@ -361,11 +394,13 @@
     cursor: pointer;
   }
   .check[aria-pressed="true"] { background: var(--paid); border-color: var(--paid); color: var(--on-paid); }
+  .check.ro { cursor: default; }
+  .check.ro[data-done="false"] { opacity: .45; }
   .check svg { display: block; }
 
-  /* free seat + drop placeholder */
+  /* place libre + cible de dépôt */
 
-  .seat {
+  .vacant {
     min-height: 56px;
     border: 1px dashed var(--line);
     border-radius: var(--r);
@@ -380,7 +415,7 @@
     align-items: center;
     padding-left: 14px;
   }
-  .seat:hover { border-color: var(--gold); color: var(--gold); }
+  .vacant:hover { border-color: var(--gold); color: var(--gold); }
 
   .drop {
     min-height: 56px;
@@ -399,7 +434,7 @@
     opacity: .97;
   }
 
-  /* named .nobody, not .empty — .pip.empty would inherit its padding */
+  /* nommée .nobody, pas .empty : .pip.empty hériterait de son padding */
   .nobody {
     text-align: center;
     color: var(--muted);
@@ -408,7 +443,7 @@
   }
   .nobody strong { display: block; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
 
-  /* ---------- composer ---------- */
+  /* ---------- ajout ---------- */
 
   .composer {
     position: sticky;
@@ -434,7 +469,7 @@
   }
   .composer input::placeholder { color: var(--muted); }
 
-  /* ---------- buttons ---------- */
+  /* ---------- boutons ---------- */
 
   button { font-family: inherit; }
 
@@ -453,7 +488,7 @@
   .btn-primary { background: var(--gold); border-color: var(--gold); color: #17150F; font-weight: 700; }
   .btn-danger { color: var(--due); border-color: var(--due); background: none; }
 
-  /* ---------- edit sheet ---------- */
+  /* ---------- fiche d'édition ---------- */
 
   .scrim {
     position: fixed;
@@ -492,6 +527,7 @@
     color: var(--muted);
     display: flex;
     justify-content: space-between;
+    gap: 10px;
   }
   .sheet h2 em { font-style: normal; color: var(--rail); }
 
@@ -503,7 +539,7 @@
     text-transform: uppercase;
     color: var(--muted);
   }
-  .field input {
+  .field input, .field select {
     font: inherit;
     font-size: 17px;
     color: var(--ink);
@@ -512,6 +548,9 @@
     border-radius: 10px;
     padding: 11px 12px;
   }
+  .field select { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .hint { font-size: 12px; color: var(--muted); }
+  .hint.late { color: var(--late); }
 
   .seg { display: flex; gap: 6px; }
   .seg button {
@@ -536,7 +575,7 @@
   .sheet-actions { display: flex; gap: 8px; }
   .sheet-actions .btn { flex: 1; }
 
-  /* ---------- snackbar ---------- */
+  /* ---------- message ---------- */
 
   .snack {
     position: fixed;
@@ -566,7 +605,9 @@
     text-transform: uppercase;
     padding: 4px 10px;
     cursor: pointer;
+    flex: none;
   }
+  .snack button[hidden] { display: none; }
 
   :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
@@ -580,34 +621,39 @@
     <div class="masthead">
       <div class="wheel" aria-hidden="true"></div>
       <div>
-        <span class="eyebrow">Handover run</span>
-        <h1>Camembert queue</h1>
+        <span class="eyebrow" id="eyebrow">Tournée de remise</span>
+        <h1>File des camemberts</h1>
       </div>
     </div>
 
-    <div class="tally">
-      <span><b id="tallyLines">0</b><i>lines</i></span>
-      <span class="t-paid"><b id="tallyPaid">0</b><i>paid</i></span>
-      <span class="t-due"><b id="tallyDue">0</b><i>to pay</i></span>
-      <span><b id="tallyDone">0</b><i>handed</i></span>
-      <span><b id="tallyEnd">—</b><i>ends</i></span>
+    <div class="tally" id="tally">
+      <span><b id="tallyLines">0</b><i>lignes</i></span>
+      <span class="t-paid"><b id="tallyPaid">0</b><i>payées</i></span>
+      <span class="t-due"><b id="tallyDue">0</b><i>à payer</i></span>
+      <span><b id="tallyDone">0</b><i>remis</i></span>
+      <span><b id="tallyEnd">—</b><i>fin</i></span>
     </div>
 
+    <p class="readonly-flag" id="readonlyFlag" hidden>
+      <b>Lecture seule</b>
+      <span id="readonlyWhen"></span>
+    </p>
+
     <button class="cfg-toggle" id="cfgToggle" aria-expanded="false" aria-controls="cfg">
-      Settings <span class="caret" aria-hidden="true">▾</span>
+      Réglages <span class="caret" aria-hidden="true">▾</span>
     </button>
 
     <div class="cfg" id="cfg" hidden>
       <div class="cfg-row">
-        <label for="startTime">First slot starts at</label>
+        <label for="startTime">Premier créneau à</label>
         <input type="time" id="startTime" value="21:30">
       </div>
       <div class="cfg-row">
-        <label for="perSlot">Camemberts per slot</label>
+        <label for="perSlot">Camemberts par créneau</label>
         <input type="number" id="perSlot" min="1" max="12" step="1" value="2">
       </div>
       <div class="cfg-row">
-        <label for="slotMinutes">Slot length</label>
+        <label for="slotMinutes">Durée du créneau</label>
         <select id="slotMinutes">
           <option value="5">5 min</option>
           <option value="10">10 min</option>
@@ -616,9 +662,11 @@
           <option value="30">30 min</option>
         </select>
       </div>
+      <hr>
       <div class="cfg-actions">
-        <button class="btn" id="copyBtn" type="button">Copy list</button>
-        <button class="btn btn-danger" id="clearBtn" type="button">Clear all</button>
+        <button class="btn" id="shareBtn" type="button">Partager en lecture seule</button>
+        <button class="btn" id="copyBtn" type="button">Copier ma liste (avec paiements)</button>
+        <button class="btn btn-danger" id="clearBtn" type="button">Tout effacer</button>
       </div>
     </div>
   </header>
@@ -626,52 +674,58 @@
   <main class="board" id="board"></main>
 
   <form class="composer" id="composer">
-    <input id="newName" type="text" placeholder="Add a name…" autocomplete="off" enterkeyhint="done" aria-label="Name for the next line">
-    <button class="btn btn-primary" type="submit">Add</button>
+    <input id="newName" type="text" placeholder="Ajouter un nom…" autocomplete="off" enterkeyhint="done" aria-label="Nom de la prochaine ligne">
+    <button class="btn btn-primary" type="submit">Ajouter</button>
   </form>
 </div>
 
 <div class="scrim" id="scrim" hidden>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="handlebar" aria-hidden="true"></div>
-    <h2 id="sheetTitle">Edit line <em id="sheetSlot">21:30</em></h2>
+    <h2 id="sheetTitle">Modifier la ligne <em id="sheetSlot">21h30</em></h2>
 
     <label class="field">
-      <span>Name</span>
+      <span>Nom</span>
       <input type="text" id="editName" autocomplete="off" enterkeyhint="done">
     </label>
 
+    <div class="field">
+      <span>Heure souhaitée</span>
+      <select id="editWish"></select>
+      <p class="hint" id="wishHint"></p>
+    </div>
+
     <label class="field">
-      <span>Note — optional</span>
-      <input type="text" id="editNote" autocomplete="off" placeholder="e.g. 2 rounds, pays by card">
+      <span>Note — facultatif</span>
+      <input type="text" id="editNote" autocomplete="off" placeholder="ex. 2 pièces, paie en carte">
     </label>
 
     <div class="field">
-      <span>Payment</span>
+      <span>Paiement</span>
       <div class="seg" id="segPay">
-        <button type="button" data-v="due" aria-pressed="false">To pay</button>
-        <button type="button" data-v="paid" aria-pressed="false">Paid</button>
+        <button type="button" data-v="due" aria-pressed="false">À payer</button>
+        <button type="button" data-v="paid" aria-pressed="false">Payé</button>
       </div>
     </div>
 
     <div class="field">
-      <span>Handover</span>
+      <span>Remise</span>
       <div class="seg" id="segDone">
-        <button type="button" data-v="pending" aria-pressed="false">Waiting</button>
-        <button type="button" data-v="done" aria-pressed="false">Handed over</button>
+        <button type="button" data-v="pending" aria-pressed="false">En attente</button>
+        <button type="button" data-v="done" aria-pressed="false">Remis</button>
       </div>
     </div>
 
     <div class="sheet-actions">
-      <button class="btn btn-danger" type="button" id="deleteBtn">Delete</button>
-      <button class="btn btn-primary" type="button" id="doneBtn">Save</button>
+      <button class="btn btn-danger" type="button" id="deleteBtn">Supprimer</button>
+      <button class="btn btn-primary" type="button" id="doneBtn">Enregistrer</button>
     </div>
   </div>
 </div>
 
 <div class="snack" id="snack" hidden role="status">
   <span id="snackText"></span>
-  <button type="button" id="snackAction">Undo</button>
+  <button type="button" id="snackAction">Annuler</button>
 </div>
 
 <script>
@@ -680,6 +734,10 @@
 
   const KEY = "camembert-handover-v1";
   const DEFAULTS = { startTime: "21:30", perSlot: 2, slotMinutes: 15, lines: [] };
+  const WISH_STEP = 15;      // l'heure souhaitée se choisit par tranches de 15 min
+  const WISH_COUNT = 28;     // ~7 h de choix à partir du premier créneau
+
+  /* ---------- état ---------- */
 
   let store = null;
   try {
@@ -689,48 +747,195 @@
   } catch (e) { store = null; }
 
   let state = structuredClone(DEFAULTS);
-  try {
-    const raw = store && store.getItem(KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      state = Object.assign(structuredClone(DEFAULTS), parsed);
-      state.lines = Array.isArray(parsed.lines) ? parsed.lines.map(normalize) : [];
-    }
-  } catch (e) { /* corrupted payload — start clean */ }
+  let readOnly = false;
+  let snapshotAt = "";
 
   function normalize(l) {
     return {
       id: String(l && l.id || uid()),
       name: String(l && l.name || ""),
       note: String(l && l.note || ""),
+      wish: String(l && l.wish || ""),
       paid: !!(l && l.paid),
       done: !!(l && l.done)
     };
   }
   function uid() { return Math.random().toString(36).slice(2, 10); }
 
-  function save() {
-    if (!store) return;
-    try { store.setItem(KEY, JSON.stringify(state)); } catch (e) { /* quota — keep running in memory */ }
+  function loadLocal() {
+    try {
+      const raw = store && store.getItem(KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      state = Object.assign(structuredClone(DEFAULTS), parsed);
+      state.lines = Array.isArray(parsed.lines) ? parsed.lines.map(normalize) : [];
+    } catch (e) { /* données illisibles — on repart à vide */ }
   }
 
-  /* ---------- time maths ---------- */
+  function save() {
+    if (readOnly || !store) return;   // un instantané ne doit jamais écraser la file
+    try { store.setItem(KEY, JSON.stringify(state)); } catch (e) { /* quota — on continue en mémoire */ }
+  }
+
+  /* ---------- heures ---------- */
 
   function startMinutes() {
     const m = /^(\d{1,2}):(\d{2})$/.exec(state.startTime || "21:30");
     if (!m) return 21 * 60 + 30;
     return (Number(m[1]) % 24) * 60 + (Number(m[2]) % 60);
   }
-  function fmt(total) {
+  function fmt(total) {                       // « 21h30 »
     const t = ((total % 1440) + 1440) % 1440;
-    return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+    return String(Math.floor(t / 60)).padStart(2, "0") + "h" + String(t % 60).padStart(2, "0");
   }
-  function slotTime(slotIndex) {
-    return fmt(startMinutes() + slotIndex * state.slotMinutes);
+  function toMinutes(hhmm) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || "");
+    return m ? (Number(m[1]) % 24) * 60 + (Number(m[2]) % 60) : null;
   }
-  function slotOf(lineIndex) { return Math.floor(lineIndex / state.perSlot); }
+  function slotOf(i) { return Math.floor(i / state.perSlot); }
+  function slotMinutesAt(i) { return startMinutes() + slotOf(i) * state.slotMinutes; }
+  function slotTime(slotIndex) { return fmt(startMinutes() + slotIndex * state.slotMinutes); }
 
-  /* ---------- elements ---------- */
+  // décalage entre l'heure réelle (issue de l'ordre) et l'heure souhaitée
+  function delay(line, index) {
+    const wish = toMinutes(line.wish);
+    if (wish == null) return null;
+    return slotMinutesAt(index) - wish;
+  }
+
+  /* ---------- instantané partagé (sans paiements) ---------- */
+
+  function b64urlEncode(str) {
+    const bytes = new TextEncoder().encode(str);
+    let bin = "";
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlDecode(s) {
+    const pad = s.replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(pad + "=".repeat((4 - pad.length % 4) % 4));
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
+  function nowHHMM() {
+    const d = new Date();
+    return fmt(d.getHours() * 60 + d.getMinutes());
+  }
+
+  // le paiement n'est jamais encodé : il ne doit pas voyager avec le lien
+  function snapshotPayload() {
+    return {
+      v: 1,
+      t: state.startTime,
+      p: state.perSlot,
+      m: state.slotMinutes,
+      at: nowHHMM(),
+      l: state.lines.map(l => ({ n: l.name, o: l.note, w: l.wish, d: l.done ? 1 : 0 }))
+    };
+  }
+
+  function readSnapshot() {
+    const src = location.hash.slice(1) || location.search.slice(1);
+    const m = /(?:^|&)s=([A-Za-z0-9\-_]+)/.exec(src);
+    if (!m) return false;
+    try {
+      const p = JSON.parse(b64urlDecode(m[1]));
+      if (!p || !Array.isArray(p.l)) return false;
+      state = {
+        startTime: String(p.t || "21:30"),
+        perSlot: Math.max(1, Math.min(12, Number(p.p) || 2)),
+        slotMinutes: Number(p.m) || 15,
+        lines: p.l.map(x => normalize({ name: x.n, note: x.o, wish: x.w, done: !!x.d }))
+      };
+      snapshotAt = String(p.at || "");
+      readOnly = true;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // vrai lien partageable ? faux dans une iframe étrangère (la page publiée),
+  // où l'URL visible n'est pas celle de ce document
+  function canShareLink() {
+    try {
+      return window.self === window.top && /^https?:$/.test(location.protocol);
+    } catch (e) { return false; }
+  }
+
+  function snapshotUrl() {
+    const base = location.href.split("#")[0].split("?")[0];
+    return base + "#s=" + b64urlEncode(JSON.stringify(snapshotPayload()));
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+
+  // page autonome, lisible hors ligne, sans paiements
+  function snapshotFile() {
+    const rows = state.lines.map((l, i) => {
+      const d = delay(l, i);
+      const wish = l.wish
+        ? '<em class="w' + (d != null && d > 0 ? " late" : "") + '">souhait ' + esc(fmt(toMinutes(l.wish)))
+          + (d != null && d > 0 ? " · +" + d + " min" : "") + "</em>"
+        : "";
+      return '<li class="' + (l.done ? "done" : "") + '"><b>' + esc(fmt(slotMinutesAt(i))) + "</b><span>"
+        + esc(l.name || "Sans nom") + (l.done ? ' <i class="t">remis</i>' : "")
+        + (l.note ? '<em class="n">' + esc(l.note) + "</em>" : "") + wish + "</span></li>";
+    }).join("");
+
+    return '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + "<title>File des camemberts</title><style>"
+      + ":root{color-scheme:light dark;--bg:#F7F5F0;--fg:#1C1B17;--mu:#6E695C;--ln:#DED7C7;--sf:#fff;--ra:#2E4A7D;--pd:#3C7550;--lt:#96590C}"
+      + "@media(prefers-color-scheme:dark){:root{--bg:#14130F;--fg:#F0EBDE;--mu:#9D9687;--ln:#38352B;--sf:#1D1B16;--ra:#94ADD8;--pd:#7CBB8B;--lt:#E3B072}}"
+      + "body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:20px 14px}"
+      + "main{max-width:560px;margin:0 auto}h1{font-size:20px;text-transform:uppercase;letter-spacing:.01em;margin:0 0 4px}"
+      + "p.sub{margin:0 0 18px;color:var(--mu);font-size:13px}"
+      + "ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}"
+      + "li{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:10px;background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:10px 12px}"
+      + "li.done{opacity:.62}li.done span>span,li.done b{text-decoration:none}"
+      + "b{font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--ra);font-size:14px}"
+      + "span{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;min-width:0;font-weight:600}"
+      + "em{font-style:normal;font-weight:400;font-size:11px;color:var(--mu);border:1px solid var(--ln);border-radius:99px;padding:2px 7px}"
+      + "em.w.late{color:var(--lt);border-color:var(--lt)}i.t{font-style:normal;font-size:11px;color:var(--pd);font-weight:700;text-transform:uppercase}"
+      + "footer{margin-top:20px;color:var(--mu);font-size:12px;text-align:center}"
+      + "</style></head><body><main><h1>File des camemberts</h1>"
+      + '<p class="sub">Instantané de ' + esc(snapshotAt || nowHHMM()) + " · premier créneau "
+      + esc(fmt(startMinutes())) + " · " + esc(String(state.perSlot)) + " par "
+      + esc(String(state.slotMinutes)) + " min</p><ul>" + rows + "</ul>"
+      + "<footer>Vue en lecture seule. Les heures affichées suivent l'ordre au moment de l'instantané.</footer>"
+      + "</main></body></html>";
+  }
+
+  function publicText() {
+    const rows = state.lines.map((l, i) => {
+      const d = delay(l, i);
+      return fmt(slotMinutesAt(i)) + "  " + (l.name || "Sans nom")
+        + (l.done ? " — remis" : "")
+        + (l.note ? " (" + l.note + ")" : "")
+        + (l.wish ? " [souhait " + fmt(toMinutes(l.wish)) + (d != null && d > 0 ? ", +" + d + " min" : "") + "]" : "");
+    });
+    return "File des camemberts — instantané de " + (snapshotAt || nowHHMM())
+      + ", premier créneau " + fmt(startMinutes()) + ", " + state.perSlot + " par "
+      + state.slotMinutes + " min\n" + rows.join("\n");
+  }
+
+  function privateText() {
+    const rows = state.lines.map((l, i) => {
+      const d = delay(l, i);
+      return fmt(slotMinutesAt(i)) + "  " + (l.name || "Sans nom")
+        + " — " + (l.paid ? "payé" : "à payer")
+        + (l.done ? " — remis" : "")
+        + (l.note ? " (" + l.note + ")" : "")
+        + (l.wish ? " [souhait " + fmt(toMinutes(l.wish)) + (d != null && d > 0 ? ", +" + d + " min" : "") + "]" : "");
+    });
+    return "File des camemberts — premier créneau " + fmt(startMinutes())
+      + ", " + state.perSlot + " par " + state.slotMinutes + " min\n" + rows.join("\n");
+  }
+
+  /* ---------- éléments ---------- */
 
   const board = document.getElementById("board");
   const scrim = document.getElementById("scrim");
@@ -738,6 +943,7 @@
   const snackText = document.getElementById("snackText");
   const snackAction = document.getElementById("snackAction");
   const newName = document.getElementById("newName");
+  const composer = document.getElementById("composer");
 
   const GRIP = '<svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor" aria-hidden="true">'
     + '<circle cx="3" cy="4" r="1.5"/><circle cx="9" cy="4" r="1.5"/>'
@@ -748,47 +954,51 @@
     + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
     + '<path d="M4 10.5 8 14.5 16 6"/></svg>';
 
-  /* ---------- drag state ---------- */
+  const drag = { id: null, target: -1, ghost: null, dy: 0, dx: 0, scroll: 0, raf: 0 };
 
-  const drag = { id: null, target: -1, ghost: null, dy: 0, dx: 0, w: 0, scroll: 0, raf: 0 };
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-  /* ---------- render ---------- */
+  /* ---------- rendu ---------- */
 
   function render() {
     const lines = state.lines;
     const seq = drag.id ? lines.filter(l => l.id !== drag.id) : lines.slice();
     const perSlot = Math.max(1, Math.min(12, Number(state.perSlot) || 2));
 
-    // positions = the rendered sequence, with a drop marker spliced in while dragging
     const positions = seq.map(l => ({ kind: "line", line: l }));
     if (drag.id) positions.splice(clamp(drag.target, 0, seq.length), 0, { kind: "drop" });
 
-    // pad the final slot with free seats so remaining capacity is visible
-    const free = positions.length === 0 ? perSlot : (perSlot - (positions.length % perSlot)) % perSlot;
-    for (let i = 0; i < free; i++) positions.push({ kind: "seat" });
+    if (!readOnly) {
+      const free = positions.length === 0 ? perSlot : (perSlot - (positions.length % perSlot)) % perSlot;
+      for (let i = 0; i < free; i++) positions.push({ kind: "vacant" });
+    }
 
     board.textContent = "";
 
     if (lines.length === 0 && !drag.id) {
-      const empty = document.createElement("p");
-      empty.className = "nobody";
-      empty.innerHTML = "<strong>No one in the queue yet.</strong>Add a name below — every "
-        + state.slotMinutes + " minutes takes " + perSlot
-        + (perSlot === 1 ? " camembert." : " camemberts.");
-      board.appendChild(empty);
+      const none = document.createElement("p");
+      none.className = "nobody";
+      none.innerHTML = readOnly
+        ? "<strong>La file est vide.</strong>Aucun nom au moment de l'instantané."
+        : "<strong>Personne dans la file.</strong>Ajoutez un nom ci-dessous — chaque créneau de "
+          + state.slotMinutes + " minutes prend " + perSlot
+          + (perSlot === 1 ? " camembert." : " camemberts.");
+      board.appendChild(none);
       updateTally();
       return;
     }
 
     const slots = Math.ceil(positions.length / perSlot);
+    let cursor = 0;
     for (let s = 0; s < slots; s++) {
       const group = positions.slice(s * perSlot, s * perSlot + perSlot);
-      board.appendChild(renderSlot(s, group));
+      board.appendChild(renderSlot(s, group, cursor));
+      cursor += group.length;
     }
     updateTally();
   }
 
-  function renderSlot(index, group) {
+  function renderSlot(index, group, firstPos) {
     const slot = document.createElement("section");
     slot.className = "slot";
 
@@ -804,8 +1014,8 @@
     pips.className = "pips";
     group.forEach(pos => {
       const pip = document.createElement("span");
-      pip.className = "pip " + (pos.kind === "line" ? (pos.line.done ? "done" : "full")
-                             : pos.kind === "drop" ? "full" : "empty");
+      pip.className = "pip " + (pos.kind === "line" ? (pos.line.done ? "pip-done" : "pip-full")
+                             : pos.kind === "drop" ? "pip-full" : "pip-free");
       pips.appendChild(pip);
     });
     rail.appendChild(pips);
@@ -813,54 +1023,79 @@
 
     const stack = document.createElement("div");
     stack.className = "stack";
-    group.forEach(pos => {
-      if (pos.kind === "line") stack.appendChild(renderCard(pos.line));
+    group.forEach((pos, i) => {
+      if (pos.kind === "line") stack.appendChild(renderCard(pos.line, firstPos + i));
       else if (pos.kind === "drop") {
         const d = document.createElement("div");
         d.className = "drop";
         stack.appendChild(d);
       } else {
-        const seat = document.createElement("button");
-        seat.type = "button";
-        seat.className = "seat";
-        seat.textContent = "Free";
-        seat.addEventListener("click", () => newName.focus());
-        stack.appendChild(seat);
+        const v = document.createElement("button");
+        v.type = "button";
+        v.className = "vacant";
+        v.textContent = "Libre";
+        v.addEventListener("click", () => newName.focus());
+        stack.appendChild(v);
       }
     });
     slot.appendChild(stack);
     return slot;
   }
 
-  function renderCard(line) {
+  function renderCard(line, position) {
     const card = document.createElement("article");
-    card.className = "card" + (line.done ? " is-done" : "");
+    card.className = "card" + (line.done ? " is-done" : "") + (readOnly ? " ro" : "");
     card.dataset.id = line.id;
 
-    const grip = document.createElement("button");
-    grip.type = "button";
-    grip.className = "grip";
-    grip.setAttribute("aria-label", "Reorder " + (line.name || "unnamed line"));
-    grip.innerHTML = GRIP;
-    grip.addEventListener("pointerdown", e => startDrag(e, line.id, card));
-    card.appendChild(grip);
+    if (!readOnly) {
+      const grip = document.createElement("button");
+      grip.type = "button";
+      grip.className = "grip";
+      grip.setAttribute("aria-label", "Réordonner " + (line.name || "ligne sans nom"));
+      grip.innerHTML = GRIP;
+      grip.addEventListener("pointerdown", e => startDrag(e, line.id, card));
+      card.appendChild(grip);
+    }
 
-    const body = document.createElement("button");
-    body.type = "button";
-    body.className = "body";
+    const content = document.createElement("div");
+    content.className = "content";
 
-    const name = document.createElement("div");
+    const name = document.createElement(readOnly ? "div" : "button");
     name.className = "name" + (line.name ? "" : " untitled");
-    name.textContent = line.name || "Unnamed";
-    body.appendChild(name);
+    name.textContent = line.name || "Sans nom";
+    if (!readOnly) {
+      name.type = "button";
+      name.setAttribute("aria-label", "Modifier " + (line.name || "ligne sans nom"));
+      name.addEventListener("click", () => openSheet(line.id));
+    }
+    content.appendChild(name);
 
     const meta = document.createElement("div");
     meta.className = "meta";
 
-    const pay = document.createElement("span");
-    pay.className = "chip " + (line.paid ? "chip-paid" : "chip-due");
-    pay.textContent = line.paid ? "Paid" : "To pay";
-    meta.appendChild(pay);
+    // le paiement se change d'une touche, et ne figure jamais en lecture seule
+    if (!readOnly) {
+      const pay = document.createElement("button");
+      pay.type = "button";
+      pay.className = "chip " + (line.paid ? "chip-paid" : "chip-due");
+      pay.textContent = line.paid ? "Payé" : "À payer";
+      pay.setAttribute("aria-label",
+        (line.paid ? "Marquer comme à payer : " : "Marquer comme payé : ") + (line.name || "ligne sans nom"));
+      pay.addEventListener("click", () => {
+        line.paid = !line.paid;
+        save();
+        render();
+      });
+      meta.appendChild(pay);
+    }
+
+    if (line.wish) {
+      const d = delay(line, position);
+      const wish = document.createElement("span");
+      wish.className = "chip chip-wish" + (d != null && d > 0 ? " late" : "");
+      wish.textContent = "souhait " + fmt(toMinutes(line.wish)) + (d != null && d > 0 ? " · +" + d + " min" : "");
+      meta.appendChild(wish);
+    }
 
     if (line.note) {
       const note = document.createElement("span");
@@ -868,21 +1103,32 @@
       note.textContent = line.note;
       meta.appendChild(note);
     }
-    body.appendChild(meta);
-    body.addEventListener("click", () => openSheet(line.id));
-    card.appendChild(body);
 
-    const check = document.createElement("button");
-    check.type = "button";
-    check.className = "check";
-    check.setAttribute("aria-pressed", String(line.done));
-    check.setAttribute("aria-label", (line.done ? "Mark as waiting: " : "Mark as handed over: ") + (line.name || "unnamed line"));
+    if (meta.childNodes.length) content.appendChild(meta);
+    card.appendChild(content);
+
+    const check = document.createElement(readOnly ? "div" : "button");
+    check.className = "check" + (readOnly ? " ro" : "");
     check.innerHTML = TICK;
-    check.addEventListener("click", () => {
-      line.done = !line.done;
-      save();
-      render();
-    });
+    if (readOnly) {
+      check.dataset.done = String(line.done);
+      check.setAttribute("role", "img");
+      check.setAttribute("aria-label", line.done ? "Remis" : "En attente");
+      if (line.done) check.setAttribute("aria-pressed", "true");
+      check.style.background = line.done ? "var(--paid)" : "var(--surface-2)";
+      check.style.color = line.done ? "var(--on-paid)" : "var(--line)";
+      check.style.borderColor = line.done ? "var(--paid)" : "var(--line)";
+    } else {
+      check.type = "button";
+      check.setAttribute("aria-pressed", String(line.done));
+      check.setAttribute("aria-label",
+        (line.done ? "Marquer en attente : " : "Marquer comme remis : ") + (line.name || "ligne sans nom"));
+      check.addEventListener("click", () => {
+        line.done = !line.done;
+        save();
+        render();
+      });
+    }
     card.appendChild(check);
 
     return card;
@@ -892,18 +1138,18 @@
     const n = state.lines.length;
     const paid = state.lines.filter(l => l.paid).length;
     const done = state.lines.filter(l => l.done).length;
-    document.getElementById("tallyLines").textContent = n;
-    document.getElementById("tallyPaid").textContent = paid;
-    document.getElementById("tallyDue").textContent = n - paid;
-    document.getElementById("tallyDone").textContent = done;
-    document.getElementById("tallyEnd").textContent = n ? slotTime(slotOf(n - 1)) : "—";
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set("tallyLines", n);
+    set("tallyPaid", paid);          // absents en lecture seule
+    set("tallyDue", n - paid);
+    set("tallyDone", done);
+    set("tallyEnd", n ? slotTime(slotOf(n - 1)) : "—");
   }
 
-  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-  /* ---------- drag & drop (pointer events: works with touch) ---------- */
+  /* ---------- glisser-déposer (pointer events : tactile et souris) ---------- */
 
   function startDrag(e, id, card) {
+    if (readOnly) return;
     if (e.button != null && e.button !== 0) return;
     e.preventDefault();
 
@@ -913,7 +1159,6 @@
     const rect = card.getBoundingClientRect();
     drag.id = id;
     drag.target = index;
-    drag.w = rect.width;
     drag.dx = e.clientX - rect.left;
     drag.dy = e.clientY - rect.top;
 
@@ -928,9 +1173,9 @@
 
     document.body.classList.add("is-dragging");
 
-    // Capture on <body>, not on the grip: every render() rebuilds the board and
-    // would destroy the grip mid-drag, silently killing the event stream.
-    try { document.body.setPointerCapture(e.pointerId); } catch (err) { /* mouse without capture support */ }
+    // capture sur <body>, pas sur la poignée : chaque rendu reconstruit le
+    // tableau et détruirait la poignée en plein glissement
+    try { document.body.setPointerCapture(e.pointerId); } catch (err) { /* souris sans capture */ }
     document.body.addEventListener("pointermove", onDragMove);
     document.body.addEventListener("pointerup", onDragEnd);
     document.body.addEventListener("pointercancel", onDragEnd);
@@ -949,7 +1194,6 @@
     e.preventDefault();
     moveGhost(e.clientX, e.clientY);
 
-    // edge auto-scroll
     const edge = 90;
     if (e.clientY < edge) drag.scroll = -Math.ceil((edge - e.clientY) / 6);
     else if (e.clientY > window.innerHeight - edge) drag.scroll = Math.ceil((e.clientY - (window.innerHeight - edge)) / 6);
@@ -983,7 +1227,7 @@
     document.body.removeEventListener("pointermove", onDragMove);
     document.body.removeEventListener("pointerup", onDragEnd);
     document.body.removeEventListener("pointercancel", onDragEnd);
-    try { document.body.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
+    try { document.body.releasePointerCapture(e.pointerId); } catch (err) { /* déjà relâché */ }
 
     if (drag.ghost) drag.ghost.remove();
     document.body.classList.remove("is-dragging");
@@ -1001,15 +1245,66 @@
     render();
   }
 
-  /* ---------- edit sheet ---------- */
+  /* ---------- fiche d'édition ---------- */
 
   let editingId = null;
   const editName = document.getElementById("editName");
   const editNote = document.getElementById("editNote");
+  const editWish = document.getElementById("editWish");
+  const wishHint = document.getElementById("wishHint");
   const segPay = document.getElementById("segPay");
   const segDone = document.getElementById("segDone");
 
   function currentLine() { return state.lines.find(l => l.id === editingId) || null; }
+
+  // les choix d'heure souhaitée partent du premier créneau réglé, par pas de 15 min
+  function fillWishOptions(selected) {
+    const base = startMinutes();
+    editWish.textContent = "";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "Aucune préférence";
+    editWish.appendChild(none);
+
+    let hasSelected = !selected;
+    for (let i = 0; i < WISH_COUNT; i++) {
+      const total = base + i * WISH_STEP;
+      const value = String(Math.floor(((total % 1440) + 1440) % 1440 / 60)).padStart(2, "0")
+        + ":" + String(total % 60).padStart(2, "0");
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = fmt(total);
+      if (value === selected) hasSelected = true;
+      editWish.appendChild(opt);
+    }
+    // une heure enregistrée avant un changement de réglage doit rester choisissable
+    if (!hasSelected) {
+      const opt = document.createElement("option");
+      opt.value = selected;
+      opt.textContent = fmt(toMinutes(selected));
+      editWish.appendChild(opt);
+    }
+    editWish.value = selected || "";
+  }
+
+  function paintWishHint() {
+    const line = currentLine();
+    if (!line) return;
+    const index = state.lines.indexOf(line);
+    const d = delay(line, index);
+    if (d == null) {
+      wishHint.className = "hint";
+      wishHint.textContent = "Remise prévue à " + fmt(slotMinutesAt(index)) + " selon l'ordre actuel.";
+    } else if (d > 0) {
+      wishHint.className = "hint late";
+      wishHint.textContent = "Remise prévue à " + fmt(slotMinutesAt(index)) + " — " + d
+        + " min après le souhait. Remontez la ligne pour la rapprocher.";
+    } else {
+      wishHint.className = "hint";
+      wishHint.textContent = "Remise prévue à " + fmt(slotMinutesAt(index))
+        + (d === 0 ? " — pile à l'heure souhaitée." : " — " + (-d) + " min avant le souhait.");
+    }
+  }
 
   function paintSegs() {
     const line = currentLine();
@@ -1021,13 +1316,16 @@
   }
 
   function openSheet(id) {
+    if (readOnly) return;
     editingId = id;
     const line = currentLine();
     if (!line) return;
     editName.value = line.name;
     editNote.value = line.note;
-    document.getElementById("sheetSlot").textContent = slotTime(slotOf(state.lines.indexOf(line)));
+    fillWishOptions(line.wish);
+    document.getElementById("sheetSlot").textContent = fmt(slotMinutesAt(state.lines.indexOf(line)));
     paintSegs();
+    paintWishHint();
     scrim.hidden = false;
     setTimeout(() => editName.focus(), 60);
   }
@@ -1037,6 +1335,7 @@
     if (!line) return;
     line.name = editName.value.trim();
     line.note = editNote.value.trim();
+    line.wish = editWish.value;
     save();
     render();
   }
@@ -1046,6 +1345,15 @@
     scrim.hidden = true;
     editingId = null;
   }
+
+  editWish.addEventListener("change", () => {
+    const line = currentLine();
+    if (!line) return;
+    line.wish = editWish.value;
+    save();
+    render();
+    paintWishHint();
+  });
 
   segPay.addEventListener("click", e => {
     const b = e.target.closest("button");
@@ -1082,20 +1390,20 @@
     editingId = null;
     save();
     render();
-    showSnack("Removed " + (line.name || "unnamed line"), "Undo", () => {
+    showSnack("Supprimé : " + (line.name || "ligne sans nom"), "Annuler", () => {
       state.lines.splice(Math.min(index, state.lines.length), 0, line);
       save();
       render();
     });
   });
 
-  /* ---------- snackbar ---------- */
+  /* ---------- message ---------- */
 
   let snackTimer = 0, snackFn = null;
 
   function showSnack(text, label, fn) {
     snackText.textContent = text;
-    snackAction.textContent = label;
+    snackAction.textContent = label || "";
     snackAction.hidden = !fn;
     snackFn = fn || null;
     snack.hidden = false;
@@ -1109,9 +1417,29 @@
     snackFn = null;
   });
 
-  /* ---------- composer ---------- */
+  /* ---------- presse-papiers ---------- */
 
-  document.getElementById("composer").addEventListener("submit", e => {
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.remove();
+      return ok;
+    }
+  }
+
+  /* ---------- ajout ---------- */
+
+  composer.addEventListener("submit", e => {
     e.preventDefault();
     const name = newName.value.trim();
     if (!name) { newName.focus(); return; }
@@ -1122,7 +1450,7 @@
     newName.focus();
   });
 
-  /* ---------- settings ---------- */
+  /* ---------- réglages ---------- */
 
   const cfg = document.getElementById("cfg");
   const cfgToggle = document.getElementById("cfgToggle");
@@ -1135,10 +1463,6 @@
     cfg.hidden = !open;
     cfgToggle.setAttribute("aria-expanded", String(open));
   });
-
-  startTime.value = state.startTime;
-  perSlot.value = state.perSlot;
-  slotMinutes.value = String(state.slotMinutes);
 
   startTime.addEventListener("change", () => {
     state.startTime = startTime.value || "21:30";
@@ -1158,51 +1482,86 @@
   });
 
   document.getElementById("copyBtn").addEventListener("click", async () => {
-    const rows = state.lines.map((l, i) =>
-      slotTime(slotOf(i)) + "  " + (l.name || "Unnamed")
-      + " — " + (l.paid ? "paid" : "to pay")
-      + (l.done ? " — handed over" : "")
-      + (l.note ? " (" + l.note + ")" : ""));
-    const text = "Camembert handover — first slot " + state.startTime
-      + ", " + state.perSlot + " per " + state.slotMinutes + " min\n" + rows.join("\n");
+    showSnack(await copy(privateText())
+      ? "Liste copiée — elle contient les paiements."
+      : "Copie bloquée ici — faites une capture d'écran.", "", null);
+  });
+
+  document.getElementById("shareBtn").addEventListener("click", async () => {
+    if (!state.lines.length) { showSnack("La file est vide — rien à partager.", "", null); return; }
+    snapshotAt = nowHHMM();
+
+    // une vraie URL n'est partageable que hors iframe étrangère
+    if (canShareLink()) {
+      showSnack(await copy(snapshotUrl())
+        ? "Lien copié — lecture seule, sans les paiements."
+        : "Copie bloquée ici — essayez le fichier.", "", null);
+      return;
+    }
+
+    const dl = window.claude && window.claude.downloads;
+    if (!dl) {
+      showSnack(await copy(publicText())
+        ? "Liste copiée — sans les paiements."
+        : "Partage indisponible ici.", "", null);
+      return;
+    }
+
     try {
-      await navigator.clipboard.writeText(text);
-      showSnack("List copied", "", null);
+      await dl.save({ filename: "file-camemberts.html", data: snapshotFile() });
+      showSnack("Fichier enregistré — envoyez-le à qui vous voulez.", "", null);
     } catch (err) {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      let ok = false;
-      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
-      ta.remove();
-      showSnack(ok ? "List copied" : "Copying is blocked here — take a screenshot instead", "", null);
+      const code = err && err.code;
+      if (code === "declined") { showSnack("Partage annulé.", "", null); return; }
+      if (code === "rate_limited") { showSnack("Trop de demandes — réessayez dans un instant.", "", null); return; }
+      // html fait partie du jeu étendu : il peut être refusé, on retombe sur le texte
+      showSnack(await copy(publicText())
+        ? "Liste copiée — sans les paiements."
+        : "Partage indisponible ici.", "", null);
     }
   });
 
   let armed = false;
-  document.getElementById("clearBtn").addEventListener("click", () => {
-    const btn = document.getElementById("clearBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  clearBtn.addEventListener("click", () => {
     if (!armed) {
       armed = true;
-      btn.textContent = "Tap again to clear";
-      setTimeout(() => { armed = false; btn.textContent = "Clear all"; }, 4000);
+      clearBtn.textContent = "Appuyez encore pour effacer";
+      setTimeout(() => { armed = false; clearBtn.textContent = "Tout effacer"; }, 4000);
       return;
     }
     const backup = state.lines;
     state.lines = [];
     armed = false;
-    btn.textContent = "Clear all";
+    clearBtn.textContent = "Tout effacer";
     save();
     render();
-    showSnack("Queue cleared", "Undo", () => {
+    showSnack("File effacée", "Annuler", () => {
       state.lines = backup;
       save();
       render();
     });
   });
+
+  /* ---------- démarrage ---------- */
+
+  if (!readSnapshot()) loadLocal();
+
+  if (readOnly) {
+    document.getElementById("readonlyFlag").hidden = false;
+    document.getElementById("readonlyWhen").textContent =
+      "Instantané de " + (snapshotAt || "l'ordre partagé") + " · les changements faits depuis n'apparaissent pas.";
+    document.getElementById("eyebrow").textContent = "Ordre partagé";
+
+    // on retire ces blocs du document plutôt que de les masquer : le mot
+    // « payé » ne doit figurer nulle part dans la page d'un lecteur
+    document.querySelectorAll(".tally .t-paid, .tally .t-due").forEach(el => el.remove());
+    [cfg, cfgToggle, composer, scrim].forEach(el => el.remove());
+  } else {
+    startTime.value = state.startTime;
+    perSlot.value = state.perSlot;
+    slotMinutes.value = String(state.slotMinutes);
+  }
 
   render();
 })();
