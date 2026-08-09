@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+<title>Camembert Handover</title>
+
+<style>
+  :root {
+    --paper:      #F7F5F0;
+    --surface:    #FFFFFF;
+    --surface-2:  #EFEBE1;
+    --line:       #DED7C7;
+    --line-soft:  #E9E4D8;
+    --ink:        #1C1B17;
+    --muted:      #6E695C;
+    --gold:       #B8841B;
+    --gold-soft:  #F2E3BC;
+    --rail:       #2E4A7D;
+    --paid:       #3C7550;
+    --paid-soft:  #DEEBE0;
+    --on-paid:    #FFFFFF;
+    --due:        #A93F2B;
+    --due-soft:   #F6DFD8;
+    --ghost:      rgba(28,27,23,.16);
+    --shadow-1:   0 1px 1px rgba(28,27,23,.05), 0 2px 6px rgba(28,27,23,.06);
+    --shadow-2:   0 10px 30px rgba(28,27,23,.20), 0 2px 6px rgba(28,27,23,.12);
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --r: 12px;
+    --pad: 14px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #14130F;
+      --surface:   #1D1B16;
+      --surface-2: #26241C;
+      --line:      #38352B;
+      --line-soft: #2C2A22;
+      --ink:       #F0EBDE;
+      --muted:     #9D9687;
+      --gold:      #E0AE4C;
+      --gold-soft: #3B3014;
+      --rail:      #94ADD8;
+      --paid:      #7CBB8B;
+      --paid-soft: #1D2E22;
+      --on-paid:   #12210F;
+      --due:       #E08A6F;
+      --due-soft:  #33201A;
+      --ghost:     rgba(240,235,222,.14);
+      --shadow-1:  0 1px 1px rgba(0,0,0,.30), 0 2px 6px rgba(0,0,0,.28);
+      --shadow-2:  0 10px 30px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:     #14130F;
+    --surface:   #1D1B16;
+    --surface-2: #26241C;
+    --line:      #38352B;
+    --line-soft: #2C2A22;
+    --ink:       #F0EBDE;
+    --muted:     #9D9687;
+    --gold:      #E0AE4C;
+    --gold-soft: #3B3014;
+    --rail:      #94ADD8;
+    --paid:      #7CBB8B;
+    --paid-soft: #1D2E22;
+    --on-paid:   #12210F;
+    --due:       #E08A6F;
+    --due-soft:  #33201A;
+    --ghost:     rgba(240,235,222,.14);
+    --shadow-1:  0 1px 1px rgba(0,0,0,.30), 0 2px 6px rgba(0,0,0,.28);
+    --shadow-2:  0 10px 30px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.4;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.is-dragging { touch-action: none; user-select: none; -webkit-user-select: none; }
+
+  .app {
+    max-width: 560px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    padding: 12px var(--pad) 10px;
+  }
+
+  .masthead { display: flex; align-items: flex-start; gap: 10px; }
+
+  .wheel {
+    flex: none;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--gold-soft);
+    border: 2px solid var(--gold);
+    position: relative;
+    margin-top: 2px;
+  }
+  .wheel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      conic-gradient(from 200deg, var(--gold) 0 46deg, transparent 46deg 360deg);
+    opacity: .55;
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.05;
+    letter-spacing: .01em;
+    font-weight: 800;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+
+  .eyebrow {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .tally {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .tally span {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .tally b { font-size: 15px; font-weight: 700; }
+  .tally i { font-style: normal; color: var(--muted); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }
+  .tally .t-paid b { color: var(--paid); }
+  .tally .t-due  b { color: var(--due); }
+
+  /* ---------- settings ---------- */
+
+  .cfg-toggle {
+    margin-top: 8px;
+    width: 100%;
+    background: none;
+    border: 0;
+    padding: 4px 0 0;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .cfg-toggle .caret { transition: transform .2s ease; }
+  .cfg-toggle[aria-expanded="true"] .caret { transform: rotate(180deg); }
+
+  .cfg {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    margin-top: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+  }
+  .cfg[hidden] { display: none; }
+  .cfg-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .cfg-row label { font-size: 13px; color: var(--muted); }
+  .cfg input, .cfg select {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 9px;
+    min-width: 104px;
+    text-align: center;
+  }
+  .cfg-actions { display: flex; gap: 8px; }
+  .cfg-actions button { flex: 1; }
+
+  /* ---------- board ---------- */
+
+  .board { flex: 1; padding: 8px var(--pad) 4px; }
+
+  .slot { display: grid; grid-template-columns: 58px 1fr; column-gap: 10px; }
+
+  .rail { position: relative; padding-top: 2px; }
+  .rail::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 26px; bottom: -2px;
+    width: 1px;
+    background: var(--line);
+  }
+  .slot:last-of-type .rail::before { display: none; }
+
+  .clock {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+    color: var(--rail);
+    text-align: center;
+    padding: 3px 0 5px;
+  }
+
+  .pips { display: flex; gap: 4px; justify-content: center; position: relative; }
+  .pip {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid var(--gold);
+    background: var(--paper);
+  }
+  .pip.full { background: var(--gold); }
+  .pip.done { background: var(--paid); border-color: var(--paid); }
+  .pip.empty { border-style: dashed; border-color: var(--line); }
+
+  .stack { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; }
+
+  /* ---------- card ---------- */
+
+  .card {
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-1);
+    padding: 8px 8px 8px 0;
+    min-height: 56px;
+  }
+  /* dashed edges mean "nothing here yet" (free seat / drop target) — a handed-over
+     line is solid, just quieted and struck through */
+  .card.is-done { background: var(--surface-2); box-shadow: none; }
+  .card.is-done .name { text-decoration: line-through; color: var(--muted); }
+  .card.is-done .chip { opacity: .75; }
+
+  .grip {
+    align-self: stretch;
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--muted);
+    cursor: grab;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r) 0 0 var(--r);
+  }
+  .grip:active { cursor: grabbing; background: var(--surface-2); }
+  .grip svg { display: block; }
+
+  .body {
+    background: none;
+    border: 0;
+    padding: 2px 0;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .name {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -.005em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .name.untitled { color: var(--muted); font-weight: 400; font-style: italic; }
+
+  .meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .chip-paid { background: var(--paid-soft); color: var(--paid); border-color: var(--paid); }
+  .chip-due  { background: var(--due-soft);  color: var(--due);  border-color: var(--due); }
+  .chip-note { color: var(--muted); border-color: var(--line); background: var(--surface-2);
+               text-transform: none; letter-spacing: .01em; font-family: var(--sans); font-size: 11px;
+               overflow: hidden; text-overflow: ellipsis; max-width: 14ch; }
+
+  .check {
+    flex: none;
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .check[aria-pressed="true"] { background: var(--paid); border-color: var(--paid); color: var(--on-paid); }
+  .check svg { display: block; }
+
+  /* free seat + drop placeholder */
+
+  .seat {
+    min-height: 56px;
+    border: 1px dashed var(--line);
+    border-radius: var(--r);
+    background: none;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding-left: 14px;
+  }
+  .seat:hover { border-color: var(--gold); color: var(--gold); }
+
+  .drop {
+    min-height: 56px;
+    border-radius: var(--r);
+    border: 1px dashed var(--gold);
+    background: var(--gold-soft);
+  }
+
+  .ghost {
+    position: fixed;
+    z-index: 90;
+    pointer-events: none;
+    box-shadow: var(--shadow-2);
+    transform-origin: 12% 50%;
+    transform: scale(1.03) rotate(-.5deg);
+    opacity: .97;
+  }
+
+  /* named .nobody, not .empty — .pip.empty would inherit its padding */
+  .nobody {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 20px;
+    font-size: 14px;
+  }
+  .nobody strong { display: block; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
+
+  /* ---------- composer ---------- */
+
+  .composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    gap: 8px;
+    padding: 10px var(--pad);
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--paper);
+    border-top: 1px solid var(--line);
+  }
+  .composer input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 11px 12px;
+  }
+  .composer input::placeholder { color: var(--muted); }
+
+  /* ---------- buttons ---------- */
+
+  button { font-family: inherit; }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--gold); border-color: var(--gold); color: #17150F; font-weight: 700; }
+  .btn-danger { color: var(--due); border-color: var(--due); background: none; }
+
+  /* ---------- edit sheet ---------- */
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(20,19,15,.5);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .scrim[hidden] { display: none; }
+
+  .sheet {
+    width: 100%;
+    max-width: 560px;
+    background: var(--paper);
+    border-radius: 18px 18px 0 0;
+    border-top: 1px solid var(--line);
+    padding: 8px var(--pad) calc(18px + env(safe-area-inset-bottom, 0px));
+    display: grid;
+    gap: 14px;
+    animation: rise .22s cubic-bezier(.2,.8,.3,1);
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+  @keyframes rise { from { transform: translateY(14px); opacity: 0; } }
+
+  .handlebar { width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: 4px auto 2px; }
+
+  .sheet h2 {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .sheet h2 em { font-style: normal; color: var(--rail); }
+
+  .field { display: grid; gap: 6px; }
+  .field > span {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .field input {
+    font: inherit;
+    font-size: 17px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 11px 12px;
+  }
+
+  .seg { display: flex; gap: 6px; }
+  .seg button {
+    flex: 1;
+    padding: 11px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { color: var(--ink); font-weight: 700; }
+  .seg button[data-v="paid"][aria-pressed="true"] { background: var(--paid-soft); border-color: var(--paid); color: var(--paid); }
+  .seg button[data-v="due"][aria-pressed="true"]  { background: var(--due-soft);  border-color: var(--due);  color: var(--due); }
+  .seg button[data-v="done"][aria-pressed="true"] { background: var(--paid-soft); border-color: var(--paid); color: var(--paid); }
+  .seg button[data-v="pending"][aria-pressed="true"] { background: var(--surface-2); border-color: var(--muted); color: var(--ink); }
+
+  .sheet-actions { display: flex; gap: 8px; }
+  .sheet-actions .btn { flex: 1; }
+
+  /* ---------- snackbar ---------- */
+
+  .snack {
+    position: fixed;
+    left: 50%;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 999px;
+    padding: 10px 10px 10px 18px;
+    font-size: 13px;
+    box-shadow: var(--shadow-2);
+    max-width: calc(100% - 28px);
+  }
+  .snack[hidden] { display: none; }
+  .snack button {
+    background: none;
+    border: 0;
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="masthead">
+      <div class="wheel" aria-hidden="true"></div>
+      <div>
+        <span class="eyebrow">Handover run</span>
+        <h1>Camembert queue</h1>
+      </div>
+    </div>
+
+    <div class="tally">
+      <span><b id="tallyLines">0</b><i>lines</i></span>
+      <span class="t-paid"><b id="tallyPaid">0</b><i>paid</i></span>
+      <span class="t-due"><b id="tallyDue">0</b><i>to pay</i></span>
+      <span><b id="tallyDone">0</b><i>handed</i></span>
+      <span><b id="tallyEnd">—</b><i>ends</i></span>
+    </div>
+
+    <button class="cfg-toggle" id="cfgToggle" aria-expanded="false" aria-controls="cfg">
+      Settings <span class="caret" aria-hidden="true">▾</span>
+    </button>
+
+    <div class="cfg" id="cfg" hidden>
+      <div class="cfg-row">
+        <label for="startTime">First slot starts at</label>
+        <input type="time" id="startTime" value="21:30">
+      </div>
+      <div class="cfg-row">
+        <label for="perSlot">Camemberts per slot</label>
+        <input type="number" id="perSlot" min="1" max="12" step="1" value="2">
+      </div>
+      <div class="cfg-row">
+        <label for="slotMinutes">Slot length</label>
+        <select id="slotMinutes">
+          <option value="5">5 min</option>
+          <option value="10">10 min</option>
+          <option value="15" selected>15 min</option>
+          <option value="20">20 min</option>
+          <option value="30">30 min</option>
+        </select>
+      </div>
+      <div class="cfg-actions">
+        <button class="btn" id="copyBtn" type="button">Copy list</button>
+        <button class="btn btn-danger" id="clearBtn" type="button">Clear all</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="board" id="board"></main>
+
+  <form class="composer" id="composer">
+    <input id="newName" type="text" placeholder="Add a name…" autocomplete="off" enterkeyhint="done" aria-label="Name for the next line">
+    <button class="btn btn-primary" type="submit">Add</button>
+  </form>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="handlebar" aria-hidden="true"></div>
+    <h2 id="sheetTitle">Edit line <em id="sheetSlot">21:30</em></h2>
+
+    <label class="field">
+      <span>Name</span>
+      <input type="text" id="editName" autocomplete="off" enterkeyhint="done">
+    </label>
+
+    <label class="field">
+      <span>Note — optional</span>
+      <input type="text" id="editNote" autocomplete="off" placeholder="e.g. 2 rounds, pays by card">
+    </label>
+
+    <div class="field">
+      <span>Payment</span>
+      <div class="seg" id="segPay">
+        <button type="button" data-v="due" aria-pressed="false">To pay</button>
+        <button type="button" data-v="paid" aria-pressed="false">Paid</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <span>Handover</span>
+      <div class="seg" id="segDone">
+        <button type="button" data-v="pending" aria-pressed="false">Waiting</button>
+        <button type="button" data-v="done" aria-pressed="false">Handed over</button>
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-danger" type="button" id="deleteBtn">Delete</button>
+      <button class="btn btn-primary" type="button" id="doneBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="snack" id="snack" hidden role="status">
+  <span id="snackText"></span>
+  <button type="button" id="snackAction">Undo</button>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const KEY = "camembert-handover-v1";
+  const DEFAULTS = { startTime: "21:30", perSlot: 2, slotMinutes: 15, lines: [] };
+
+  let store = null;
+  try {
+    localStorage.setItem(KEY + "-probe", "1");
+    localStorage.removeItem(KEY + "-probe");
+    store = localStorage;
+  } catch (e) { store = null; }
+
+  let state = structuredClone(DEFAULTS);
+  try {
+    const raw = store && store.getItem(KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state = Object.assign(structuredClone(DEFAULTS), parsed);
+      state.lines = Array.isArray(parsed.lines) ? parsed.lines.map(normalize) : [];
+    }
+  } catch (e) { /* corrupted payload — start clean */ }
+
+  function normalize(l) {
+    return {
+      id: String(l && l.id || uid()),
+      name: String(l && l.name || ""),
+      note: String(l && l.note || ""),
+      paid: !!(l && l.paid),
+      done: !!(l && l.done)
+    };
+  }
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+
+  function save() {
+    if (!store) return;
+    try { store.setItem(KEY, JSON.stringify(state)); } catch (e) { /* quota — keep running in memory */ }
+  }
+
+  /* ---------- time maths ---------- */
+
+  function startMinutes() {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(state.startTime || "21:30");
+    if (!m) return 21 * 60 + 30;
+    return (Number(m[1]) % 24) * 60 + (Number(m[2]) % 60);
+  }
+  function fmt(total) {
+    const t = ((total % 1440) + 1440) % 1440;
+    return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+  }
+  function slotTime(slotIndex) {
+    return fmt(startMinutes() + slotIndex * state.slotMinutes);
+  }
+  function slotOf(lineIndex) { return Math.floor(lineIndex / state.perSlot); }
+
+  /* ---------- elements ---------- */
+
+  const board = document.getElementById("board");
+  const scrim = document.getElementById("scrim");
+  const snack = document.getElementById("snack");
+  const snackText = document.getElementById("snackText");
+  const snackAction = document.getElementById("snackAction");
+  const newName = document.getElementById("newName");
+
+  const GRIP = '<svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor" aria-hidden="true">'
+    + '<circle cx="3" cy="4" r="1.5"/><circle cx="9" cy="4" r="1.5"/>'
+    + '<circle cx="3" cy="10" r="1.5"/><circle cx="9" cy="10" r="1.5"/>'
+    + '<circle cx="3" cy="16" r="1.5"/><circle cx="9" cy="16" r="1.5"/></svg>';
+
+  const TICK = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" '
+    + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M4 10.5 8 14.5 16 6"/></svg>';
+
+  /* ---------- drag state ---------- */
+
+  const drag = { id: null, target: -1, ghost: null, dy: 0, dx: 0, w: 0, scroll: 0, raf: 0 };
+
+  /* ---------- render ---------- */
+
+  function render() {
+    const lines = state.lines;
+    const seq = drag.id ? lines.filter(l => l.id !== drag.id) : lines.slice();
+    const perSlot = Math.max(1, Math.min(12, Number(state.perSlot) || 2));
+
+    // positions = the rendered sequence, with a drop marker spliced in while dragging
+    const positions = seq.map(l => ({ kind: "line", line: l }));
+    if (drag.id) positions.splice(clamp(drag.target, 0, seq.length), 0, { kind: "drop" });
+
+    // pad the final slot with free seats so remaining capacity is visible
+    const free = positions.length === 0 ? perSlot : (perSlot - (positions.length % perSlot)) % perSlot;
+    for (let i = 0; i < free; i++) positions.push({ kind: "seat" });
+
+    board.textContent = "";
+
+    if (lines.length === 0 && !drag.id) {
+      const empty = document.createElement("p");
+      empty.className = "nobody";
+      empty.innerHTML = "<strong>No one in the queue yet.</strong>Add a name below — every "
+        + state.slotMinutes + " minutes takes " + perSlot
+        + (perSlot === 1 ? " camembert." : " camemberts.");
+      board.appendChild(empty);
+      updateTally();
+      return;
+    }
+
+    const slots = Math.ceil(positions.length / perSlot);
+    for (let s = 0; s < slots; s++) {
+      const group = positions.slice(s * perSlot, s * perSlot + perSlot);
+      board.appendChild(renderSlot(s, group));
+    }
+    updateTally();
+  }
+
+  function renderSlot(index, group) {
+    const slot = document.createElement("section");
+    slot.className = "slot";
+
+    const rail = document.createElement("div");
+    rail.className = "rail";
+
+    const clock = document.createElement("div");
+    clock.className = "clock";
+    clock.textContent = slotTime(index);
+    rail.appendChild(clock);
+
+    const pips = document.createElement("div");
+    pips.className = "pips";
+    group.forEach(pos => {
+      const pip = document.createElement("span");
+      pip.className = "pip " + (pos.kind === "line" ? (pos.line.done ? "done" : "full")
+                             : pos.kind === "drop" ? "full" : "empty");
+      pips.appendChild(pip);
+    });
+    rail.appendChild(pips);
+    slot.appendChild(rail);
+
+    const stack = document.createElement("div");
+    stack.className = "stack";
+    group.forEach(pos => {
+      if (pos.kind === "line") stack.appendChild(renderCard(pos.line));
+      else if (pos.kind === "drop") {
+        const d = document.createElement("div");
+        d.className = "drop";
+        stack.appendChild(d);
+      } else {
+        const seat = document.createElement("button");
+        seat.type = "button";
+        seat.className = "seat";
+        seat.textContent = "Free";
+        seat.addEventListener("click", () => newName.focus());
+        stack.appendChild(seat);
+      }
+    });
+    slot.appendChild(stack);
+    return slot;
+  }
+
+  function renderCard(line) {
+    const card = document.createElement("article");
+    card.className = "card" + (line.done ? " is-done" : "");
+    card.dataset.id = line.id;
+
+    const grip = document.createElement("button");
+    grip.type = "button";
+    grip.className = "grip";
+    grip.setAttribute("aria-label", "Reorder " + (line.name || "unnamed line"));
+    grip.innerHTML = GRIP;
+    grip.addEventListener("pointerdown", e => startDrag(e, line.id, card));
+    card.appendChild(grip);
+
+    const body = document.createElement("button");
+    body.type = "button";
+    body.className = "body";
+
+    const name = document.createElement("div");
+    name.className = "name" + (line.name ? "" : " untitled");
+    name.textContent = line.name || "Unnamed";
+    body.appendChild(name);
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+
+    const pay = document.createElement("span");
+    pay.className = "chip " + (line.paid ? "chip-paid" : "chip-due");
+    pay.textContent = line.paid ? "Paid" : "To pay";
+    meta.appendChild(pay);
+
+    if (line.note) {
+      const note = document.createElement("span");
+      note.className = "chip chip-note";
+      note.textContent = line.note;
+      meta.appendChild(note);
+    }
+    body.appendChild(meta);
+    body.addEventListener("click", () => openSheet(line.id));
+    card.appendChild(body);
+
+    const check = document.createElement("button");
+    check.type = "button";
+    check.className = "check";
+    check.setAttribute("aria-pressed", String(line.done));
+    check.setAttribute("aria-label", (line.done ? "Mark as waiting: " : "Mark as handed over: ") + (line.name || "unnamed line"));
+    check.innerHTML = TICK;
+    check.addEventListener("click", () => {
+      line.done = !line.done;
+      save();
+      render();
+    });
+    card.appendChild(check);
+
+    return card;
+  }
+
+  function updateTally() {
+    const n = state.lines.length;
+    const paid = state.lines.filter(l => l.paid).length;
+    const done = state.lines.filter(l => l.done).length;
+    document.getElementById("tallyLines").textContent = n;
+    document.getElementById("tallyPaid").textContent = paid;
+    document.getElementById("tallyDue").textContent = n - paid;
+    document.getElementById("tallyDone").textContent = done;
+    document.getElementById("tallyEnd").textContent = n ? slotTime(slotOf(n - 1)) : "—";
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  /* ---------- drag & drop (pointer events: works with touch) ---------- */
+
+  function startDrag(e, id, card) {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+
+    const index = state.lines.findIndex(l => l.id === id);
+    if (index < 0) return;
+
+    const rect = card.getBoundingClientRect();
+    drag.id = id;
+    drag.target = index;
+    drag.w = rect.width;
+    drag.dx = e.clientX - rect.left;
+    drag.dy = e.clientY - rect.top;
+
+    const ghost = card.cloneNode(true);
+    ghost.classList.add("ghost");
+    ghost.style.width = rect.width + "px";
+    ghost.style.left = "0px";
+    ghost.style.top = "0px";
+    document.body.appendChild(ghost);
+    drag.ghost = ghost;
+    moveGhost(e.clientX, e.clientY);
+
+    document.body.classList.add("is-dragging");
+
+    // Capture on <body>, not on the grip: every render() rebuilds the board and
+    // would destroy the grip mid-drag, silently killing the event stream.
+    try { document.body.setPointerCapture(e.pointerId); } catch (err) { /* mouse without capture support */ }
+    document.body.addEventListener("pointermove", onDragMove);
+    document.body.addEventListener("pointerup", onDragEnd);
+    document.body.addEventListener("pointercancel", onDragEnd);
+
+    render();
+  }
+
+  function moveGhost(x, y) {
+    if (!drag.ghost) return;
+    drag.ghost.style.transform =
+      "translate(" + (x - drag.dx) + "px," + (y - drag.dy) + "px) scale(1.03) rotate(-.5deg)";
+  }
+
+  function onDragMove(e) {
+    if (!drag.id) return;
+    e.preventDefault();
+    moveGhost(e.clientX, e.clientY);
+
+    // edge auto-scroll
+    const edge = 90;
+    if (e.clientY < edge) drag.scroll = -Math.ceil((edge - e.clientY) / 6);
+    else if (e.clientY > window.innerHeight - edge) drag.scroll = Math.ceil((e.clientY - (window.innerHeight - edge)) / 6);
+    else drag.scroll = 0;
+    if (drag.scroll && !drag.raf) drag.raf = requestAnimationFrame(autoScroll);
+
+    updateTarget(e.clientY);
+  }
+
+  function autoScroll() {
+    drag.raf = 0;
+    if (!drag.id || !drag.scroll) return;
+    window.scrollBy(0, drag.scroll);
+    drag.raf = requestAnimationFrame(autoScroll);
+  }
+
+  function updateTarget(clientY) {
+    const cards = Array.from(board.querySelectorAll(".card"));
+    let index = 0;
+    for (const el of cards) {
+      const r = el.getBoundingClientRect();
+      if (clientY > r.top + r.height / 2) index++;
+    }
+    if (index !== drag.target) {
+      drag.target = index;
+      render();
+    }
+  }
+
+  function onDragEnd(e) {
+    document.body.removeEventListener("pointermove", onDragMove);
+    document.body.removeEventListener("pointerup", onDragEnd);
+    document.body.removeEventListener("pointercancel", onDragEnd);
+    try { document.body.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ }
+
+    if (drag.ghost) drag.ghost.remove();
+    document.body.classList.remove("is-dragging");
+    drag.scroll = 0;
+
+    const id = drag.id, target = drag.target;
+    drag.id = null; drag.ghost = null; drag.target = -1;
+
+    const from = state.lines.findIndex(l => l.id === id);
+    if (from >= 0) {
+      const [moved] = state.lines.splice(from, 1);
+      state.lines.splice(clamp(target, 0, state.lines.length), 0, moved);
+      save();
+    }
+    render();
+  }
+
+  /* ---------- edit sheet ---------- */
+
+  let editingId = null;
+  const editName = document.getElementById("editName");
+  const editNote = document.getElementById("editNote");
+  const segPay = document.getElementById("segPay");
+  const segDone = document.getElementById("segDone");
+
+  function currentLine() { return state.lines.find(l => l.id === editingId) || null; }
+
+  function paintSegs() {
+    const line = currentLine();
+    if (!line) return;
+    segPay.querySelectorAll("button").forEach(b =>
+      b.setAttribute("aria-pressed", String((b.dataset.v === "paid") === line.paid)));
+    segDone.querySelectorAll("button").forEach(b =>
+      b.setAttribute("aria-pressed", String((b.dataset.v === "done") === line.done)));
+  }
+
+  function openSheet(id) {
+    editingId = id;
+    const line = currentLine();
+    if (!line) return;
+    editName.value = line.name;
+    editNote.value = line.note;
+    document.getElementById("sheetSlot").textContent = slotTime(slotOf(state.lines.indexOf(line)));
+    paintSegs();
+    scrim.hidden = false;
+    setTimeout(() => editName.focus(), 60);
+  }
+
+  function commitSheet() {
+    const line = currentLine();
+    if (!line) return;
+    line.name = editName.value.trim();
+    line.note = editNote.value.trim();
+    save();
+    render();
+  }
+
+  function closeSheet() {
+    commitSheet();
+    scrim.hidden = true;
+    editingId = null;
+  }
+
+  segPay.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    const line = currentLine();
+    if (!b || !line) return;
+    line.paid = b.dataset.v === "paid";
+    paintSegs();
+    save();
+    render();
+  });
+
+  segDone.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    const line = currentLine();
+    if (!b || !line) return;
+    line.done = b.dataset.v === "done";
+    paintSegs();
+    save();
+    render();
+  });
+
+  document.getElementById("doneBtn").addEventListener("click", closeSheet);
+  scrim.addEventListener("click", e => { if (e.target === scrim) closeSheet(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !scrim.hidden) closeSheet(); });
+  editName.addEventListener("keydown", e => { if (e.key === "Enter") closeSheet(); });
+  editNote.addEventListener("keydown", e => { if (e.key === "Enter") closeSheet(); });
+
+  document.getElementById("deleteBtn").addEventListener("click", () => {
+    const line = currentLine();
+    if (!line) return;
+    const index = state.lines.indexOf(line);
+    state.lines.splice(index, 1);
+    scrim.hidden = true;
+    editingId = null;
+    save();
+    render();
+    showSnack("Removed " + (line.name || "unnamed line"), "Undo", () => {
+      state.lines.splice(Math.min(index, state.lines.length), 0, line);
+      save();
+      render();
+    });
+  });
+
+  /* ---------- snackbar ---------- */
+
+  let snackTimer = 0, snackFn = null;
+
+  function showSnack(text, label, fn) {
+    snackText.textContent = text;
+    snackAction.textContent = label;
+    snackAction.hidden = !fn;
+    snackFn = fn || null;
+    snack.hidden = false;
+    clearTimeout(snackTimer);
+    snackTimer = setTimeout(() => { snack.hidden = true; snackFn = null; }, 6000);
+  }
+
+  snackAction.addEventListener("click", () => {
+    if (snackFn) snackFn();
+    snack.hidden = true;
+    snackFn = null;
+  });
+
+  /* ---------- composer ---------- */
+
+  document.getElementById("composer").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = newName.value.trim();
+    if (!name) { newName.focus(); return; }
+    state.lines.push(normalize({ id: uid(), name }));
+    newName.value = "";
+    save();
+    render();
+    newName.focus();
+  });
+
+  /* ---------- settings ---------- */
+
+  const cfg = document.getElementById("cfg");
+  const cfgToggle = document.getElementById("cfgToggle");
+  const startTime = document.getElementById("startTime");
+  const perSlot = document.getElementById("perSlot");
+  const slotMinutes = document.getElementById("slotMinutes");
+
+  cfgToggle.addEventListener("click", () => {
+    const open = cfg.hidden;
+    cfg.hidden = !open;
+    cfgToggle.setAttribute("aria-expanded", String(open));
+  });
+
+  startTime.value = state.startTime;
+  perSlot.value = state.perSlot;
+  slotMinutes.value = String(state.slotMinutes);
+
+  startTime.addEventListener("change", () => {
+    state.startTime = startTime.value || "21:30";
+    save();
+    render();
+  });
+  perSlot.addEventListener("change", () => {
+    state.perSlot = clamp(Number(perSlot.value) || 2, 1, 12);
+    perSlot.value = state.perSlot;
+    save();
+    render();
+  });
+  slotMinutes.addEventListener("change", () => {
+    state.slotMinutes = Number(slotMinutes.value) || 15;
+    save();
+    render();
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    const rows = state.lines.map((l, i) =>
+      slotTime(slotOf(i)) + "  " + (l.name || "Unnamed")
+      + " — " + (l.paid ? "paid" : "to pay")
+      + (l.done ? " — handed over" : "")
+      + (l.note ? " (" + l.note + ")" : ""));
+    const text = "Camembert handover — first slot " + state.startTime
+      + ", " + state.perSlot + " per " + state.slotMinutes + " min\n" + rows.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      showSnack("List copied", "", null);
+    } catch (err) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+      ta.remove();
+      showSnack(ok ? "List copied" : "Copying is blocked here — take a screenshot instead", "", null);
+    }
+  });
+
+  let armed = false;
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    const btn = document.getElementById("clearBtn");
+    if (!armed) {
+      armed = true;
+      btn.textContent = "Tap again to clear";
+      setTimeout(() => { armed = false; btn.textContent = "Clear all"; }, 4000);
+      return;
+    }
+    const backup = state.lines;
+    state.lines = [];
+    armed = false;
+    btn.textContent = "Clear all";
+    save();
+    render();
+    showSnack("Queue cleared", "Undo", () => {
+      state.lines = backup;
+      save();
+      render();
+    });
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
