@@ -37,6 +37,19 @@ slot, 15 minutes — all three are editable under *Réglages*.
 Per line: name, optional note, payment (`à payer` / `payé`), handover
 (`en attente` / `remis`), and an optional **desired time** (`heure souhaitée`).
 
+### Total cap
+
+*Nombre de camemberts max* caps how many lines the queue may hold. `0` or an
+empty field means no cap, which is the default. Once the cap is reached, adding
+another line is refused with an error message rather than silently accepted —
+the typed name is kept in the field, the field is flagged, and the message
+carries a *Réglages* shortcut that opens settings focused on the cap.
+
+The cap only ever blocks **new** lines. Lowering it below the current count
+deletes nothing; it warns and lets the counter read over quota (`4 / 2`). Free
+seats are also clamped to the remaining allowance, so a seat shown as available
+can always actually be filled.
+
 The desired time is a *request*, not a result. It is picked from a list starting
 at the configured first slot and stepping 15 minutes, and it never moves a line
 — position alone decides the real handover time. When the derived time lands
@@ -84,3 +97,20 @@ still owes money.
   and left the composer visible to public readers.
 - Anything added to the reader's view must be checked against the rendered DOM,
   not just styled out of sight.
+- The snackbar takes real multi-line messages, so it is a rounded rectangle, not
+  a `999px` pill (which renders as an ellipse once text wraps), and it is
+  centred with `left/right + margin: auto` rather than `left: 50%` (which caps
+  its shrink-to-fit width at half the viewport and wraps text far too early).
+
+## Tests
+
+Two Playwright scripts, both run against the served file:
+
+```
+python3 -m http.server 8899        # from this folder
+node test.mjs                      # migration, toggles, desired time, drag, sharing
+node test-max.mjs                  # the total cap and its refusal path
+```
+
+`test.mjs` seeds a queue in the pre-desired-time format to prove existing saved
+records still load, and asserts what the public snapshot view may not contain.

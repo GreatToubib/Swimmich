@@ -184,6 +184,8 @@
   .tally i { font-style: normal; color: var(--muted); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
   .tally .t-paid b { color: var(--paid); }
   .tally .t-due  b { color: var(--due); }
+  .tally .full b { color: var(--due); }
+  .tally b small { font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
 
   .readonly-flag {
     display: flex;
@@ -468,6 +470,12 @@
     padding: 11px 12px;
   }
   .composer input::placeholder { color: var(--muted); }
+  .composer input.invalid { border-color: var(--due); background: var(--due-soft); animation: shake .3s ease; }
+
+  @keyframes shake {
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
 
   /* ---------- boutons ---------- */
 
@@ -579,22 +587,31 @@
 
   .snack {
     position: fixed;
-    left: 50%;
+    /* left/right + margin auto, pas left:50% : sinon la largeur disponible
+       est plafonnée à la moitié de l'écran et le texte se casse tôt */
+    left: 14px;
+    right: 14px;
+    width: fit-content;
+    margin: 0 auto;
     bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-    transform: translateX(-50%);
     z-index: 80;
     display: flex;
     align-items: center;
     gap: 14px;
     background: var(--ink);
     color: var(--paper);
-    border-radius: 999px;
-    padding: 10px 10px 10px 18px;
+    /* pas de 999px : un message qui passe à la ligne deviendrait une ellipse */
+    border-radius: 14px;
+    padding: 11px 12px 11px 16px;
     font-size: 13px;
+    line-height: 1.35;
     box-shadow: var(--shadow-2);
     max-width: calc(100% - 28px);
   }
   .snack[hidden] { display: none; }
+  /* --due et --paper s'inversent ensemble : le contraste tient dans les deux thèmes */
+  .snack.error { background: var(--due); color: var(--paper); }
+  .snack.error button { color: var(--paper); text-decoration: underline; }
   .snack button {
     background: none;
     border: 0;
@@ -651,6 +668,10 @@
       <div class="cfg-row">
         <label for="perSlot">Camemberts par créneau</label>
         <input type="number" id="perSlot" min="1" max="12" step="1" value="2">
+      </div>
+      <div class="cfg-row">
+        <label for="maxTotal">Nombre de camemberts max</label>
+        <input type="number" id="maxTotal" min="0" max="999" step="1" placeholder="illimité">
       </div>
       <div class="cfg-row">
         <label for="slotMinutes">Durée du créneau</label>
@@ -733,7 +754,7 @@
   "use strict";
 
   const KEY = "camembert-handover-v1";
-  const DEFAULTS = { startTime: "21:30", perSlot: 2, slotMinutes: 15, lines: [] };
+  const DEFAULTS = { startTime: "21:30", perSlot: 2, slotMinutes: 15, maxTotal: 0, lines: [] };
   const WISH_STEP = 15;      // l'heure souhaitée se choisit par tranches de 15 min
   const WISH_COUNT = 28;     // ~7 h de choix à partir du premier créneau
 
@@ -768,6 +789,7 @@
       if (!raw) return;
       const parsed = JSON.parse(raw);
       state = Object.assign(structuredClone(DEFAULTS), parsed);
+      state.maxTotal = clamp(Number(parsed.maxTotal) || 0, 0, 999);
       state.lines = Array.isArray(parsed.lines) ? parsed.lines.map(normalize) : [];
     } catch (e) { /* données illisibles — on repart à vide */ }
   }
@@ -793,6 +815,11 @@
     return m ? (Number(m[1]) % 24) * 60 + (Number(m[2]) % 60) : null;
   }
   function slotOf(i) { return Math.floor(i / state.perSlot); }
+
+  // 0 = pas de plafond
+  function isCapped() { return state.maxTotal > 0; }
+  function isFull() { return isCapped() && state.lines.length >= state.maxTotal; }
+  function remaining() { return isCapped() ? Math.max(0, state.maxTotal - state.lines.length) : Infinity; }
   function slotMinutesAt(i) { return startMinutes() + slotOf(i) * state.slotMinutes; }
   function slotTime(slotIndex) { return fmt(startMinutes() + slotIndex * state.slotMinutes); }
 
@@ -969,7 +996,10 @@
     if (drag.id) positions.splice(clamp(drag.target, 0, seq.length), 0, { kind: "drop" });
 
     if (!readOnly) {
-      const free = positions.length === 0 ? perSlot : (perSlot - (positions.length % perSlot)) % perSlot;
+      // les places libres ne dépassent jamais le plafond : ce qui s'affiche
+      // comme disponible doit réellement pouvoir être rempli
+      let free = positions.length === 0 ? perSlot : (perSlot - (positions.length % perSlot)) % perSlot;
+      free = Math.min(free, remaining());
       for (let i = 0; i < free; i++) positions.push({ kind: "vacant" });
     }
 
@@ -1140,10 +1170,27 @@
     const done = state.lines.filter(l => l.done).length;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set("tallyLines", n);
+
+    // « 12 / 24 » quand un plafond est réglé, et en rouge une fois atteint
+    const linesCell = document.getElementById("tallyLines");
+    if (linesCell && isCapped()) {
+      const over = document.createElement("small");
+      over.textContent = " / " + state.maxTotal;
+      linesCell.appendChild(over);
+    }
+    if (linesCell && linesCell.parentElement) {
+      linesCell.parentElement.classList.toggle("full", isCapped() && n >= state.maxTotal);
+    }
     set("tallyPaid", paid);          // absents en lecture seule
     set("tallyDue", n - paid);
     set("tallyDone", done);
     set("tallyEnd", n ? slotTime(slotOf(n - 1)) : "—");
+
+    if (!readOnly) {
+      newName.placeholder = isFull()
+        ? "Maximum atteint (" + state.maxTotal + ")"
+        : "Ajouter un nom…";
+    }
   }
 
   /* ---------- glisser-déposer (pointer events : tactile et souris) ---------- */
@@ -1401,11 +1448,13 @@
 
   let snackTimer = 0, snackFn = null;
 
-  function showSnack(text, label, fn) {
+  function showSnack(text, label, fn, isError) {
     snackText.textContent = text;
     snackAction.textContent = label || "";
     snackAction.hidden = !fn;
     snackFn = fn || null;
+    snack.classList.toggle("error", !!isError);
+    snack.setAttribute("role", isError ? "alert" : "status");
     snack.hidden = false;
     clearTimeout(snackTimer);
     snackTimer = setTimeout(() => { snack.hidden = true; snackFn = null; }, 6000);
@@ -1443,12 +1492,39 @@
     e.preventDefault();
     const name = newName.value.trim();
     if (!name) { newName.focus(); return; }
+
+    // le plafond bloque l'ajout : on garde le nom saisi pour ne rien perdre
+    if (isFull()) {
+      showSnack("Maximum atteint : " + state.maxTotal + " camemberts.",
+        "Réglages", () => {
+          cfg.hidden = false;
+          cfgToggle.setAttribute("aria-expanded", "true");
+          maxTotalInput.focus();
+          maxTotalInput.select();
+        }, true);
+      flagInvalid();
+      return;
+    }
+
     state.lines.push(normalize({ id: uid(), name }));
     newName.value = "";
     save();
     render();
     newName.focus();
   });
+
+  let invalidTimer = 0;
+  function flagInvalid() {
+    newName.classList.remove("invalid");
+    void newName.offsetWidth;            // relance l'animation si on réessaie
+    newName.classList.add("invalid");
+    newName.setAttribute("aria-invalid", "true");
+    clearTimeout(invalidTimer);
+    invalidTimer = setTimeout(() => {
+      newName.classList.remove("invalid");
+      newName.removeAttribute("aria-invalid");
+    }, 1600);
+  }
 
   /* ---------- réglages ---------- */
 
@@ -1457,6 +1533,7 @@
   const startTime = document.getElementById("startTime");
   const perSlot = document.getElementById("perSlot");
   const slotMinutes = document.getElementById("slotMinutes");
+  const maxTotalInput = document.getElementById("maxTotal");
 
   cfgToggle.addEventListener("click", () => {
     const open = cfg.hidden;
@@ -1479,6 +1556,19 @@
     state.slotMinutes = Number(slotMinutes.value) || 15;
     save();
     render();
+  });
+
+  maxTotalInput.addEventListener("change", () => {
+    const asked = clamp(Math.floor(Number(maxTotalInput.value) || 0), 0, 999);
+    state.maxTotal = asked;
+    maxTotalInput.value = asked > 0 ? String(asked) : "";
+    save();
+    render();
+    // baisser le plafond sous le nombre de lignes n'en supprime aucune
+    if (asked > 0 && state.lines.length > asked) {
+      showSnack("Maximum à " + asked + ", or la file en compte " + state.lines.length
+        + ". Rien n'a été supprimé.", "", null, true);
+    }
   });
 
   document.getElementById("copyBtn").addEventListener("click", async () => {
@@ -1561,6 +1651,7 @@
     startTime.value = state.startTime;
     perSlot.value = state.perSlot;
     slotMinutes.value = String(state.slotMinutes);
+    maxTotalInput.value = state.maxTotal > 0 ? String(state.maxTotal) : "";
   }
 
   render();
