@@ -1,0 +1,38 @@
+# Publishes tools/camembert-handover to GitHub Pages, and nothing else from
+# this fork. Requires Settings -> Pages -> Source: "GitHub Actions" (one-time).
+name: Camembert handover — Pages
+
+on:
+  push:
+    branches: [swimmich]
+    paths: ['tools/camembert-handover/**', '.github/workflows/camembert-pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# never let two Pages deploys race
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - name: Upload the app folder only
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: tools/camembert-handover
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
