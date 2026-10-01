@@ -4,35 +4,41 @@ Context carry-over for new Claude sessions. For day-to-day rules see `CLAUDE.md`
 
 ## What Swimmich is
 A personal **fork of Immich** (self-hosted photo manager), tracking tag
-**v3.0.3** (migrated from v2.7.5 on 2026-07-27). It adds a Tinder-style **photo
-triage / "sort deck"** to the mobile app. Solo dev. Workflow: branch off
-`swimmich-test` → build to phone → ready-to-merge PRs.
+**v3.2.4** (upgraded from v3.0.3 on 2026-10-01; v2.7.5 → v3.0.3 on 2026-07-27). It
+adds a Tinder-style **photo triage / "sort deck"** to the mobile app. Solo dev.
+Workflow: branch off `swimmich-test` → build to phone → ready-to-merge PRs.
 
-Note the `swimmich-test` **branch** remains the integration branch even though
-the test *server* was decommissioned on 2026-07-28 to reclaim disk.
+Note the `swimmich-test` **branch** remains the integration branch. Prod moved to
+the Contabo VPS on 2026-10-01; a test stack can be brought up next to it on demand
+(`deploy/contabo/test-stack/`).
 
 - GitHub: `GreatToubib/Swimmich` (gh needs `--repo GreatToubib/Swimmich`).
 - Integration branch: **`swimmich-test`** (branch features from here, not `main`).
 - Feature branches: `feat/swimmich/sN-...`.
 
 ## The sort feature (built & merged into `swimmich-test`)
-- A bootstrap service creates 6 system albums on first login: `_New`,
-  `_Review Later`, `⭐`, `⭐⭐`, `⭐⭐⭐`, and backfills existing assets into `_New`.
+- Triage state lives in native asset fields, not albums: a server-side
+  `sortStatus` column (`new` / `review_later` / `kept`, migration
+  `1783000000000-AddAssetSortStatus`), the native `rating` (1-5 stars) and
+  `isFavorite`. The original `_New` / `_Review Later` / `⭐` system albums were
+  replaced by this on 2026-05-22 (s3) and no longer exist.
 - Sort deck (card swipe): **Delete** (trash), **Review Later**, **Sorted**.
-  "Sorted" can add the asset to user "quick-pick" albums + assign an **exclusive**
-  star rating (3★ ⇒ ⭐⭐⭐ only, not cumulative).
-- Source picker bottom sheet chooses which albums feed the deck (defaults:
-  New + Review Later). Loads each album separately and unions/dedupes — because
-  Immich's metadata search **ANDs** `albumIds` (intersection), not OR.
+  "Sorted" sets `kept`, an optional star rating and favourite, and can add the
+  asset to user "quick-pick" albums. Every action can be undone from a banner.
+- Source sheet chooses which statuses × albums feed the deck (defaults: New +
+  Review Later, "No album"). Each album is queried separately and the results
+  unioned/deduped, because Immich's metadata search **ANDs** `albumIds`.
 - Quick-pick chips: 4 pinned + 4 recent (MRU, 30-day prune). Deleted albums are
   pruned on Sort-tab open.
 - Edit mode: re-sorting an already-sorted card pre-selects its current albums +
-  star, and reconciles (removes de-selected). Album changes are mirrored into the
-  local **Drift** DB so the Albums view updates without a full re-sync.
+  star, and reconciles (removes de-selected). Changes are mirrored into the local
+  **Drift** DB so the Photos/Albums views update without a full re-sync.
+- Optional "delete local copy": swiping a card that is also on the phone queues its
+  device file for the OS trash (batched, flushed on tab switch / app pause).
 - Key files: `mobile/lib/services/sort_action.service.dart`,
   `mobile/lib/pages/sort/sort.page.dart`,
   `mobile/lib/pages/sort/sort_source_sheet.dart`,
-  `mobile/lib/providers/{sort_queue,sort_source_filter,quick_pick,system_album_ids}.provider.dart`.
+  `mobile/lib/providers/{sort_queue,sort_filter,quick_pick,local_delete_queue}.provider.dart`.
 
 ## Release status (Android only, Firebase App Distribution)
 - ✅ **Rebrand merged** (PR #9): `applicationId app.swimmich` (Kotlin namespace
