@@ -240,3 +240,8 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
 final sortQueueProvider =
     AsyncNotifierProvider<SortQueueNotifier, SortQueueState>(
         SortQueueNotifier.new);
+
+/// Bumped by the album picker's "Sort into N albums" button. The deck then sorts
+/// the current card exactly like a right swipe, so the card's stars and favourite
+/// apply.
+final sortCurrentCardRequestProvider = StateProvider<int>((ref) => 0);

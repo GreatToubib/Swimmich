@@ -24,7 +24,8 @@ the Contabo VPS on 2026-10-01; a test stack can be brought up next to it on dema
   replaced by this on 2026-05-22 (s3) and no longer exist.
 - Sort deck (card swipe): **Delete** (trash), **Review Later**, **Sorted**.
   "Sorted" sets `kept`, an optional star rating and favourite, and can add the
-  asset to user "quick-pick" albums. Every action can be undone from a banner.
+  asset to user "quick-pick" albums ("Sort into N albums" in the album picker does
+  the same as a right swipe). A delete can be undone from the banner that follows it.
 - Source sheet chooses which statuses × albums feed the deck (defaults: New +
   Review Later, "No album"). Each album is queried separately and the results
   unioned/deduped, because Immich's metadata search **ANDs** `albumIds`.

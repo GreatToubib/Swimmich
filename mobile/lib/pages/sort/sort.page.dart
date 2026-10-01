@@ -668,6 +668,13 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
 
+    // "Sort into N albums" in the album picker sorts this card like a right swipe.
+    ref.listen<int>(sortCurrentCardRequestProvider, (_, _) {
+      if (!_isAnimating) {
+        unawaited(_commitAction(SortAction.sorted));
+      }
+    });
+
     Widget mainCard = Stack(
       children: [
         // Solid background so portrait photos don't reveal the peek card.

@@ -6,7 +6,6 @@ import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
-import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:openapi/api.dart';
 
 /// Opens the full-search album picker. The user can select multiple albums
@@ -38,7 +37,6 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   bool _showCreateField = false;
   bool _isCreating = false;
   String? _createError;
-  bool _isSorting = false;
 
   List<AlbumResponseDto>? _allAlbums;
   bool _loading = true;
@@ -144,36 +142,15 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
     }
   }
 
-  Future<void> _executeSortAndClose() async {
-    final current = ref.read(sortQueueProvider).valueOrNull?.current;
-    if (current == null) {
+  /// Sorts the current card into the selected albums. The deck does the work, as
+  /// for a right swipe: calling the sort service from here dropped the card's
+  /// stars and cleared its favourite.
+  void _executeSortAndClose() {
+    if (ref.read(sortQueueProvider).valueOrNull?.current == null) {
       return;
     }
-
-    setState(() => _isSorting = true);
-    final assetId = current.id;
-    final qpIds = ref.read(quickPickProvider).selected.toList();
-
-    try {
-      await ref.read(sortQueueProvider.notifier).advance();
-      await ref.read(sortActionServiceProvider).execute(
-            assetId,
-            SortAction.sorted,
-            quickPickAlbumIds: qpIds,
-          );
-      ref.read(quickPickProvider.notifier).recordUsage(qpIds);
-      ref.read(quickPickProvider.notifier).clearSelection();
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      setState(() => _isSorting = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sort failed: $e')),
-        );
-      }
-    }
+    ref.read(sortCurrentCardRequestProvider.notifier).state++;
+    Navigator.of(context).pop();
   }
 
   @override
@@ -314,19 +291,8 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: selectedCount == 0 || _isSorting
-                    ? null
-                    : _executeSortAndClose,
-                icon: _isSorting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.check_circle_outline),
+                onPressed: selectedCount == 0 ? null : _executeSortAndClose,
+                icon: const Icon(Icons.check_circle_outline),
                 label: Text(
                   selectedCount == 0
                       ? 'Select an album first'
