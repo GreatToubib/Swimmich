@@ -29,7 +29,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -89,7 +90,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -134,6 +136,7 @@ select
   "asset"."type",
   "asset"."width",
   "asset"."height",
+  "asset"."sortStatus",
   to_json("asset_exif") as "exifInfo"
 from
   "asset"
@@ -182,7 +185,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   inner join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -347,6 +351,7 @@ select
   "asset"."type",
   "asset"."width",
   "asset"."height",
+  "asset"."sortStatus",
   to_jsonb("asset_exif") as "exifInfo"
 from
   "asset"
@@ -449,7 +454,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -497,7 +503,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -557,7 +564,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -605,7 +613,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -653,7 +662,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -701,7 +711,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -749,7 +760,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -797,7 +809,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -852,7 +865,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -906,7 +920,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -968,7 +983,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1022,7 +1038,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1078,7 +1095,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1139,7 +1157,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1193,7 +1212,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1248,7 +1268,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1299,7 +1320,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1347,7 +1369,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1398,7 +1421,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1447,7 +1471,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1495,7 +1520,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1555,7 +1581,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1619,7 +1646,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1667,7 +1695,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1712,7 +1741,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1760,7 +1790,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1813,7 +1844,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
@@ -1869,7 +1901,8 @@ select
   "asset"."thumbhash",
   "asset"."type",
   "asset"."width",
-  "asset"."height"
+  "asset"."height",
+  "asset"."sortStatus"
 from
   "asset"
   left join "asset_exif" on "asset"."id" = "asset_exif"."assetId"
