@@ -86,10 +86,13 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
       // Reload the sort deck on resume if the user is caught up (newly added
       // photos default to sortStatus 'new' server-side and surface via search);
-      // never yank a mid-sort user.
-      final q = _ref.read(sortQueueProvider).valueOrNull;
-      if (q == null || q.current == null) {
-        unawaited(_ref.read(sortQueueProvider.notifier).refresh());
+      // never yank a mid-sort user. A deck that was never built loads fresh on
+      // first use, so there is nothing to reload.
+      if (_ref.exists(sortQueueProvider)) {
+        final q = _ref.read(sortQueueProvider).valueOrNull;
+        if (q == null || q.current == null) {
+          unawaited(_ref.read(sortQueueProvider.notifier).refresh());
+        }
       }
     }
 
@@ -194,8 +197,10 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     _log.info("App paused");
 
     // Flush any local-copy deletions queued while sorting (covers leaving the
-    // app without first switching tabs).
-    unawaited(_ref.read(localDeleteQueueProvider.notifier).flush());
+    // app without first switching tabs). No queue yet means nothing queued.
+    if (_ref.exists(localDeleteQueueProvider)) {
+      unawaited(_ref.read(localDeleteQueueProvider.notifier).flush());
+    }
 
     // Prevent overlapping pause operations
     if (_pauseOperation != null && !_pauseOperation!.isCompleted) {

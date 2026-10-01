@@ -47,7 +47,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _fetchAlbums();
+    unawaited(_fetchAlbums());
   }
 
   @override
@@ -106,7 +106,9 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
   Future<void> _createAlbum(String name) async {
     final trimmed = name.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty) {
+      return;
+    }
 
     final all = _allAlbums ?? <AlbumResponseDto>[];
     if (all.any((a) => a.albumName == trimmed)) {
@@ -144,7 +146,9 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
 
   Future<void> _executeSortAndClose() async {
     final current = ref.read(sortQueueProvider).valueOrNull?.current;
-    if (current == null) return;
+    if (current == null) {
+      return;
+    }
 
     setState(() => _isSorting = true);
     final assetId = current.id;
@@ -159,7 +163,9 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
           );
       ref.read(quickPickProvider.notifier).recordUsage(qpIds);
       ref.read(quickPickProvider.notifier).clearSelection();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       setState(() => _isSorting = false);
       if (mounted) {

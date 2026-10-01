@@ -372,7 +372,9 @@ class SplashScreenPageState extends ConsumerState<SplashScreenPage> {
     // clean install - change the default of the flag
     // current install not using beta timeline
     if (context.router.current.name == SplashScreenRoute.name) {
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
       unawaited(context.replaceRoute(const TabShellRoute()));
     }
   }

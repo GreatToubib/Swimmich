@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
@@ -122,7 +124,7 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
             // JSON null, which is a different query from omitting the field.
             isNotInAlbum: spec.noAlbum ? const Optional.present(true) : const Optional.absent(),
             page: Optional.present(_page),
-            size: Optional.present(_pageSize),
+            size: const Optional.present(_pageSize),
             withDeleted: const Optional.present(false),
             // EXIF carries the native star rating used to prefill the card.
             withExif: const Optional.present(true),
@@ -133,7 +135,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
           continue;
         }
         for (final asset in resp.assets.items) {
-          if (seen.add(asset.id)) merged.add(asset);
+          if (seen.add(asset.id)) {
+            merged.add(asset);
+          }
         }
         if (resp.assets.nextPage == null) {
           _advanceSpec();
@@ -164,7 +168,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   /// drops below [_loadMoreThreshold].
   Future<void> advance() async {
     final s = state.valueOrNull;
-    if (s == null) return;
+    if (s == null) {
+      return;
+    }
 
     final next = s.currentIndex + 1;
 
@@ -183,7 +189,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   /// Used by undo to make the un-done card immediately visible.
   void insertAtCurrent(AssetResponseDto asset) {
     final s = state.valueOrNull;
-    if (s == null) return;
+    if (s == null) {
+      return;
+    }
     final next = List<AssetResponseDto>.from(s.assets)
       ..insert(s.currentIndex, asset);
     state = AsyncData(s.copyWith(assets: next));
@@ -192,7 +200,9 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   /// Rolls back a single [advance] call for optimistic-failure recovery.
   void revertAdvance() {
     final s = state.valueOrNull;
-    if (s == null || s.currentIndex == 0) return;
+    if (s == null || s.currentIndex == 0) {
+      return;
+    }
     state = AsyncData(s.copyWith(currentIndex: s.currentIndex - 1));
   }
 
@@ -207,17 +217,21 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
   /// Pre-warm the image cache for the next [_prefetchAhead] cards.
   void prefetchNext(BuildContext context) {
     final s = state.valueOrNull;
-    if (s == null) return;
+    if (s == null) {
+      return;
+    }
     final from = s.currentIndex + 1;
     final to = (from + _prefetchAhead).clamp(0, s.assets.length);
     for (int i = from; i < to; i++) {
       final asset = s.assets[i];
-      precacheImage(
-        RemoteImageProvider.thumbnail(
-          assetId: asset.id,
-          thumbhash: asset.thumbhash ?? '',
+      unawaited(
+        precacheImage(
+          RemoteImageProvider.thumbnail(
+            assetId: asset.id,
+            thumbhash: asset.thumbhash ?? '',
+          ),
+          context,
         ),
-        context,
       );
     }
   }

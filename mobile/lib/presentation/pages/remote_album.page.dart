@@ -158,7 +158,9 @@ class _RemoteAlbumPageState extends ConsumerState<RemoteAlbumPage> {
           try {
             final body = jsonDecode(e.message ?? '{}') as Map<String, dynamic>;
             final serverMsg = body['message'];
-            if (serverMsg is String && serverMsg.isNotEmpty) msg = serverMsg;
+            if (serverMsg is String && serverMsg.isNotEmpty) {
+              msg = serverMsg;
+            }
           } catch (_) {}
         }
         ImmichToast.show(context: context, msg: msg, toastType: ToastType.error);
