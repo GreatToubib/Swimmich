@@ -6,6 +6,8 @@ mobile/ios/**/*.g.swift linguist-generated=true
 
 mobile/drift_schemas/main/drift_schema_*.json -diff -merge
 mobile/drift_schemas/main/drift_schema_*.json linguist-generated=true
+# Swimmich: drift compares these byte for byte, so a CRLF checkout on Windows breaks `drift_dev make-migrations`
+mobile/drift_schemas/main/drift_schema_*.json text eol=lf
 
 mobile/lib/infrastructure/repositories/db.repository.steps.dart -diff -merge
 mobile/lib/infrastructure/repositories/db.repository.steps.dart linguist-generated=true
