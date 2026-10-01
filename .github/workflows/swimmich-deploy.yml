@@ -7,6 +7,9 @@ name: Swimmich Build & Deploy
 on:
   push:
     branches: [swimmich, swimmich-test]
+    # Server deploy files only: no image to build
+    paths-ignore:
+      - 'deploy/**'
   workflow_dispatch:
 
 concurrency:

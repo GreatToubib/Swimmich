@@ -7,12 +7,12 @@ import 'package:immich_mobile/entities/store.entity.dart';
 import 'package:immich_mobile/extensions/platform_extensions.dart';
 import 'package:immich_mobile/providers/auth.provider.dart';
 import 'package:immich_mobile/providers/background_sync.provider.dart';
-import 'package:immich_mobile/providers/backup/drift_backup.provider.dart';
-import 'package:immich_mobile/providers/local_delete_queue.provider.dart';
+import 'package:immich_mobile/providers/backup/backup.provider.dart';
 import 'package:immich_mobile/providers/gallery_permission.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/memory.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/platform.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/settings.provider.dart';
+import 'package:immich_mobile/providers/local_delete_queue.provider.dart';
 import 'package:immich_mobile/providers/permission.provider.dart';
 import 'package:immich_mobile/providers/server_info.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
@@ -37,8 +37,9 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     return state;
   }
 
-  void handleAppResume() async {
+  Future<void> handleAppResume() async {
     state = AppLifeCycleEnum.resumed;
+    _log.info("App resumed");
 
     // Prevent overlapping resume operations
     if (_resumeOperation != null && !_resumeOperation!.isCompleted) {
@@ -68,6 +69,7 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
   Future<void> _performResume() async {
     // no need to resume because app was never really paused
     if (!_wasPaused) {
+      _log.info("Resume skipped, app was never paused");
       return;
     }
     _wasPaused = false;
@@ -84,13 +86,20 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
       // Reload the sort deck on resume if the user is caught up (newly added
       // photos default to sortStatus 'new' server-side and surface via search);
-      // never yank a mid-sort user.
-      final q = _ref.read(sortQueueProvider).valueOrNull;
-      if (q == null || q.current == null) {
-        unawaited(_ref.read(sortQueueProvider.notifier).refresh());
+      // never yank a mid-sort user. A deck that was never built loads fresh on
+      // first use, so there is nothing to reload.
+      if (_ref.exists(sortQueueProvider)) {
+        final q = _ref.read(sortQueueProvider).valueOrNull;
+        if (q == null || q.current == null) {
+          unawaited(_ref.read(sortQueueProvider.notifier).refresh());
+        }
       }
     }
 
+    if (!_shouldContinueOperation()) {
+      _wasPaused = true;
+      return;
+    }
     _ref.read(websocketProvider.notifier).connect();
     await _handleBetaTimelineResume();
 
@@ -99,13 +108,13 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     await _ref.read(galleryPermissionNotifier.notifier).getGalleryPermissionStatus();
   }
 
-  Future<void> _safeRun(Future<void> action, String debugName) async {
+  Future<void> _safeRun(Future<void> Function() action, String debugName) async {
     if (!_shouldContinueOperation()) {
       return;
     }
 
     try {
-      await action;
+      await action();
     } catch (e, stackTrace) {
       _log.warning("Error during $debugName operation", e, stackTrace);
     }
@@ -118,30 +127,39 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     final backgroundManager = _ref.read(backgroundSyncProvider);
+
+    // Drop any sync that froze mid-flight while the app was suspended so resume
+    // starts fresh instead of awaiting the stale task (#28082). cancelResumeSyncs
+    // clears the task refs synchronously, so the syncs below see a clean slate.
+    unawaited(backgroundManager.cancelResumeSyncs());
+
     final isAlbumLinkedSyncEnable = _ref.read(appConfigProvider).backup.syncAlbums;
 
     try {
       bool syncSuccess = false;
       await Future.wait([
-        _safeRun(backgroundManager.syncLocal(full: CurrentPlatform.isAndroid ? true : false), "syncLocal"),
-        _safeRun(backgroundManager.syncRemote().then((success) => syncSuccess = success), "syncRemote"),
+        _safeRun(() => backgroundManager.syncLocal(full: CurrentPlatform.isAndroid), "syncLocal"),
+        _safeRun(() async {
+          syncSuccess = await backgroundManager.syncRemote();
+        }, "syncRemote"),
       ]);
-      _ref.invalidate(driftMemoryFutureProvider);
+      _ref.invalidate(memoryLaneProvider);
+      _ref.invalidate(allMemoriesProvider);
       if (syncSuccess) {
         await Future.wait([
-          _safeRun(backgroundManager.hashAssets(), "hashAssets").then((_) {
-            _resumeBackup();
+          _safeRun(backgroundManager.hashAssets, "hashAssets").then((_) {
+            unawaited(_resumeBackup());
           }),
           _resumeBackup(),
           // TODO: Bring back when the soft freeze issue is addressed
           // _safeRun(backgroundManager.syncCloudIds(), "syncCloudIds"),
         ]);
       } else {
-        await _safeRun(backgroundManager.hashAssets(), "hashAssets");
+        await _safeRun(backgroundManager.hashAssets, "hashAssets");
       }
 
       if (isAlbumLinkedSyncEnable) {
-        await _safeRun(backgroundManager.syncLinkedAlbum(), "syncLinkedAlbum");
+        await _safeRun(backgroundManager.syncLinkedAlbum, "syncLinkedAlbum");
       }
     } catch (e, stackTrace) {
       _log.severe("Error during background sync", e, stackTrace);
@@ -155,7 +173,7 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
       final currentUser = Store.tryGet(StoreKey.currentUser);
       if (currentUser != null) {
         await _safeRun(
-          _ref.read(driftBackupProvider.notifier).startForegroundBackup(currentUser.id),
+          () => _ref.read(backupProvider.notifier).startForegroundBackup(currentUser.id),
           "handleBackupResume",
         );
       }
@@ -176,10 +194,13 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
   Future<void> handleAppPause() async {
     state = AppLifeCycleEnum.paused;
     _wasPaused = true;
+    _log.info("App paused");
 
     // Flush any local-copy deletions queued while sorting (covers leaving the
-    // app without first switching tabs).
-    unawaited(_ref.read(localDeleteQueueProvider.notifier).flush());
+    // app without first switching tabs). No queue yet means nothing queued.
+    if (_ref.exists(localDeleteQueueProvider)) {
+      unawaited(_ref.read(localDeleteQueueProvider.notifier).flush());
+    }
 
     // Prevent overlapping pause operations
     if (_pauseOperation != null && !_pauseOperation!.isCompleted) {
@@ -209,7 +230,7 @@ class AppLifeCycleNotifier extends StateNotifier<AppLifeCycleEnum> {
 
   Future<void> _performPause() {
     if (_ref.read(authProvider).isAuthenticated) {
-      _ref.read(driftBackupProvider.notifier).stopForegroundBackup();
+      _ref.read(backupProvider.notifier).stopForegroundBackup(reason: "the app being sent to the background");
 
       _ref.read(websocketProvider.notifier).disconnect();
     }

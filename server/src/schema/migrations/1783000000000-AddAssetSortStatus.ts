@@ -10,8 +10,12 @@ import { Kysely, sql } from 'kysely';
 // to boot with "corrupted migrations: expected previously executed migration
 // 1779364515374-AddAlbumSystemKind to be at index 68".
 //
-// Keep fork migrations numbered above every upstream migration. Renumber again if
-// a future upstream release lands anything above this value.
+// Do not renumber it again: it has been applied on prod, and renaming an applied
+// migration fails with "previously executed migration ... is missing". The check on
+// every upstream bump is the reverse one: no *new* upstream migration may sort below
+// an applied fork migration. Upstream migrations sorting above this one are fine;
+// they simply run after it (v3.2.4's start at 1784647658615). Number a new fork
+// migration just above the newest upstream one at that time, and list it in ORDER.
 //
 // IF NOT EXISTS so databases that already ran the old 1779400000000 copy (whose
 // kysely_migrations row is deleted as part of the same fix) re-run this as a no-op.

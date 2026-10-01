@@ -10,7 +10,9 @@ class UndoStackNotifier extends StateNotifier<List<UndoRecord>> {
   }
 
   UndoRecord? pop() {
-    if (state.isEmpty) return null;
+    if (state.isEmpty) {
+      return null;
+    }
     final top = state.first;
     state = state.skip(1).toList();
     return top;

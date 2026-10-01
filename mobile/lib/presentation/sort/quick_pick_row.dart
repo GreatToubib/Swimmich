@@ -43,7 +43,9 @@ class QuickPickRow extends ConsumerWidget {
 
     Widget mruChip(int slot) {
       final chip = chips[slot];
-      if (chip == null) return const SizedBox.shrink();
+      if (chip == null) {
+        return const SizedBox.shrink();
+      }
       return _AlbumChip(
         albumName: nameFor(chip.albumId),
         isSelected: qp.selected.contains(chip.albumId),
@@ -103,7 +105,9 @@ class QuickPickRow extends ConsumerWidget {
     required List<RemoteAlbum> albums,
     required QuickPickState qp,
   }) async {
-    if (albums.isEmpty) return;
+    if (albums.isEmpty) {
+      return;
+    }
 
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -367,7 +371,6 @@ class _PinPickerSheet extends StatelessWidget {
 }
 
 // Re-exported for backward compat (used by sort.page.dart indirectly).
-// ignore: unused_element
 class DottedBorderChip extends StatelessWidget {
   const DottedBorderChip({super.key, required this.label, required this.theme});
 

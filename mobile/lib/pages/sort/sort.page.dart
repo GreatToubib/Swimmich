@@ -7,24 +7,24 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/domain/models/asset/base_asset.model.dart';
 import 'package:immich_mobile/pages/sort/sort_source_sheet.dart';
-import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
-import 'package:immich_mobile/providers/local_delete_queue.provider.dart';
-import 'package:immich_mobile/providers/sort_filter.provider.dart';
-import 'package:immich_mobile/providers/sort_settings.provider.dart';
 import 'package:immich_mobile/presentation/sort/quick_pick_row.dart';
 import 'package:immich_mobile/presentation/sort/star_rating_bar.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
 import 'package:immich_mobile/presentation/sort/storage_badge.dart';
 import 'package:immich_mobile/presentation/widgets/images/remote_image_provider.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
 import 'package:immich_mobile/providers/haptic_feedback.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/providers/local_delete_queue.provider.dart';
 import 'package:immich_mobile/providers/quick_pick.provider.dart';
+import 'package:immich_mobile/providers/sort_filter.provider.dart';
 import 'package:immich_mobile/providers/sort_queue.provider.dart';
-import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
+import 'package:immich_mobile/providers/sort_settings.provider.dart';
 import 'package:immich_mobile/providers/tab.provider.dart';
 import 'package:immich_mobile/providers/undo_stack.provider.dart';
 import 'package:immich_mobile/services/sort_action.service.dart';
 import 'package:immich_mobile/widgets/swimmich/sort_app_bar.dart';
+import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 import 'package:openapi/api.dart';
 
 AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
@@ -361,8 +361,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     _originalSortStatus = asset.sortStatus;
     _originalUserAlbumIds = const {};
     _localId = null;
-    Future.microtask(() {
-      if (!mounted || widget.asset.id != asset.id) return;
+    unawaited(Future.microtask(() {
+      if (!mounted || widget.asset.id != asset.id) {
+        return;
+      }
       setState(() {
         _starRating = rating;
         _isFavorite = asset.isFavorite;
@@ -371,7 +373,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       ref.read(quickPickProvider.notifier).clearSelection();
       unawaited(_prefillAlbums(asset.id));
       unawaited(_resolveLocalId(asset.id));
-    });
+    }));
   }
 
   /// Looks up whether this card's photo also exists locally on this device
@@ -379,8 +381,10 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   Future<void> _resolveLocalId(String assetId) async {
     try {
       final remote =
-          await ref.read(remoteAssetRepositoryProvider).get(assetId);
-      if (!mounted || widget.asset.id != assetId) return;
+          await ref.read(driftProvider).remoteAssetRepository.get(assetId);
+      if (!mounted || widget.asset.id != assetId) {
+        return;
+      }
       setState(() => _localId = remote?.localId);
     } catch (_) {
       // Best-effort; treat as cloud-only on failure.
@@ -396,7 +400,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
           .read(apiServiceProvider)
           .albumsApi
           .getAllAlbums(assetId: assetId);
-      if (albums == null || !mounted || widget.asset.id != assetId) return;
+      if (albums == null || !mounted || widget.asset.id != assetId) {
+        return;
+      }
 
       final memberIds = albums.map((a) => a.id).toSet();
       _originalUserAlbumIds = memberIds;
@@ -412,8 +418,12 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
     if (_drag.dy > _vThreshold && _drag.dy > _drag.dx.abs()) {
       return SortAction.reviewLater;
     }
-    if (_drag.dx > _hThreshold) return SortAction.sorted;
-    if (_drag.dx < -_hThreshold) return SortAction.delete;
+    if (_drag.dx > _hThreshold) {
+      return SortAction.sorted;
+    }
+    if (_drag.dx < -_hThreshold) {
+      return SortAction.delete;
+    }
     return null;
   }
 
@@ -426,9 +436,15 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
         SortAction.reviewLater => Colors.amber,
       };
     }
-    if (_drag.dx < -20) return Colors.red;
-    if (_drag.dx > 20) return Colors.green;
-    if (_drag.dy > 20) return Colors.amber;
+    if (_drag.dx < -20) {
+      return Colors.red;
+    }
+    if (_drag.dx > 20) {
+      return Colors.green;
+    }
+    if (_drag.dy > 20) {
+      return Colors.amber;
+    }
     return null;
   }
 
@@ -456,13 +472,17 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   // ── Gesture callbacks ──────────────────────────────────────────────────────
 
   void _onPanUpdate(DragUpdateDetails d) {
-    if (_isAnimating) return;
+    if (_isAnimating) {
+      return;
+    }
     setState(() => _drag += d.delta);
     if (!_hapticFired && _activeAction != null) {
       ref.read(hapticFeedbackProvider.notifier).mediumImpact();
       _hapticFired = true;
     }
-    if (_activeAction == null) _hapticFired = false;
+    if (_activeAction == null) {
+      _hapticFired = false;
+    }
   }
 
   void _onPanEnd(DragEndDetails _) {
@@ -472,7 +492,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       return;
     }
     // Keeping is always allowed — rating, favourite and album are all optional.
-    _commitAction(action);
+    unawaited(_commitAction(action));
   }
 
   // ── Animations ─────────────────────────────────────────────────────────────
@@ -482,9 +502,9 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
       CurvedAnimation(parent: _bounceController, curve: Curves.elasticOut),
     );
     _isAnimating = true;
-    _bounceController
-      ..reset()
-      ..forward().then((_) {
+    _bounceController.reset();
+    unawaited(
+      _bounceController.forward().then((_) {
         if (mounted) {
           setState(() {
             _drag = Offset.zero;
@@ -492,7 +512,8 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
             _hapticFired = false;
           });
         }
-      });
+      }),
+    );
   }
 
   Future<void> _commitAction(SortAction action) async {
@@ -511,11 +532,15 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
 
     // 1. Play fly-off animation.
     await _flyController.forward();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     // 2. Optimistically advance to the next card.
     await ref.read(sortQueueProvider.notifier).advance();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     // Capture the swiped card's values before the deck advances.
     final assetId = widget.asset.id;
@@ -642,6 +667,13 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+
+    // "Sort into N albums" in the album picker sorts this card like a right swipe.
+    ref.listen<int>(sortCurrentCardRequestProvider, (_, _) {
+      if (!_isAnimating) {
+        unawaited(_commitAction(SortAction.sorted));
+      }
+    });
 
     Widget mainCard = Stack(
       children: [

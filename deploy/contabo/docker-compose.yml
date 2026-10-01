@@ -1,0 +1,70 @@
+# Swimmich prod on the Contabo VPS (vmi3622327, 167.86.115.97).
+# deploy.sh copies this file to /opt/immich/docker-compose.yml; paths are relative to /opt/immich:
+#   .env        from .env.example (DB password, never committed)
+#   library/    uploads, thumbs, encoded videos, Immich's own DB dumps
+#   postgres/   database files
+#   src/        sparse clone of this repository (deploy/contabo only)
+# HTTPS: Caddy (/opt/caddy) reaches immich-server over the external "proxy" network.
+name: immich
+
+services:
+  immich-server:
+    container_name: immich-server
+    image: ${SWIMMICH_IMAGE}
+    volumes:
+      - ${UPLOAD_LOCATION}:/data
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    ports:
+      # Localhost only: scripts on the VPS (tag-mycamera) use the API here
+      - '127.0.0.1:2283:2283'
+    depends_on:
+      - redis
+      - database
+    restart: always
+    networks:
+      - default
+      - proxy
+    healthcheck:
+      disable: false
+
+  immich-machine-learning:
+    container_name: immich-machine-learning
+    image: ghcr.io/immich-app/immich-machine-learning:${ML_VERSION}
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    restart: always
+    healthcheck:
+      disable: false
+
+  redis:
+    container_name: immich-redis
+    image: docker.io/valkey/valkey:9@sha256:3b55fbaa0cd93cf0d9d961f405e4dfcc70efe325e2d84da207a0a8e6d8fde4f9
+    healthcheck:
+      test: redis-cli ping || exit 1
+    restart: always
+
+  database:
+    container_name: immich-postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    restart: always
+    healthcheck:
+      disable: false
+
+volumes:
+  model-cache:
+
+networks:
+  proxy:
+    external: true

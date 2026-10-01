@@ -1,10 +1,9 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_album.repository.dart';
 import 'package:immich_mobile/infrastructure/repositories/remote_asset.repository.dart';
-import 'package:immich_mobile/providers/infrastructure/album.provider.dart';
-import 'package:immich_mobile/providers/infrastructure/asset.provider.dart';
+import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
+import 'package:immich_mobile/repositories/album_api_repository.dart';
 import 'package:immich_mobile/repositories/asset_api.repository.dart';
-import 'package:immich_mobile/repositories/drift_album_api_repository.dart';
 import 'package:openapi/api.dart';
 
 enum SortAction { delete, reviewLater, sorted }
@@ -64,8 +63,8 @@ class SortActionService {
   );
 
   final AssetApiRepository _assetRepo;
-  final DriftAlbumApiRepository _albumRepo;
-  final DriftRemoteAlbumRepository _driftAlbumRepo;
+  final AlbumApiRepository _albumRepo;
+  final RemoteAlbumRepository _driftAlbumRepo;
   final RemoteAssetRepository _driftAssetRepo;
 
   /// Best-effort mirror of a server change into the local Drift store so the
@@ -141,14 +140,14 @@ class SortActionService {
           SortStatus.kept,
           rating: starRating,
         );
-        await _assetRepo.updateFavorite([assetId], favorite);
+        await _assetRepo.update([assetId], isFavorite: .some(favorite));
         await _reconcileAlbums(
           assetId,
           quickPickAlbumIds.toSet(),
           previousQuickPickAlbumIds.toSet(),
         );
         // Mirror favourite + rating into the local store for the Photos view.
-        await _mirror(() => _driftAssetRepo.updateFavorite([assetId], favorite));
+        await _mirror(() => _driftAssetRepo.updateAssets([assetId], isFavorite: .some(favorite)));
         if (starRating != null) {
           await _mirror(() => _driftAssetRepo.updateRating(assetId, starRating));
         }
@@ -173,7 +172,7 @@ class SortActionService {
           record.previousSortStatus,
           rating: record.previousStarRating,
         );
-        await _assetRepo.updateFavorite([assetId], record.previousFavorite);
+        await _assetRepo.update([assetId], isFavorite: .some(record.previousFavorite));
         // Reverse the user-album changes: remove what we added, restore what
         // we removed.
         final target = record.quickPickIds.toSet();
@@ -181,7 +180,7 @@ class SortActionService {
         await _reconcileAlbums(assetId, previous, target);
         // Mirror the restored favourite + rating into the local store.
         await _mirror(
-            () => _driftAssetRepo.updateFavorite([assetId], record.previousFavorite));
+            () => _driftAssetRepo.updateAssets([assetId], isFavorite: .some(record.previousFavorite)));
         await _mirror(() =>
             _driftAssetRepo.updateRating(assetId, record.previousStarRating));
     }
@@ -191,8 +190,8 @@ class SortActionService {
 final sortActionServiceProvider = Provider<SortActionService>(
   (ref) => SortActionService(
     ref.watch(assetApiRepositoryProvider),
-    ref.watch(driftAlbumApiRepositoryProvider),
-    ref.watch(remoteAlbumRepository),
-    ref.watch(remoteAssetRepositoryProvider),
+    ref.watch(albumApiRepositoryProvider),
+    ref.watch(driftProvider).remoteAlbumRepository,
+    ref.watch(driftProvider).remoteAssetRepository,
   ),
 );
