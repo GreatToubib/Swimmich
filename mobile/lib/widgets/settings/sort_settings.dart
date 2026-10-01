@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/providers/api.provider.dart';
@@ -19,7 +21,7 @@ class SortSettings extends ConsumerWidget {
 
     // Trigger a load so chip names display correctly even if Albums tab
     // was never visited. Safe to call on every build — the notifier debounces.
-    ref.read(remoteAlbumProvider.notifier).refresh();
+    unawaited(ref.read(remoteAlbumProvider.notifier).refresh());
 
     Widget pinnedTile(int slot) {
       final albumId = qp.pinned[slot];
@@ -122,7 +124,7 @@ class _AlbumPickerSheetState extends ConsumerState<_AlbumPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _load();
+    unawaited(_load());
   }
 
   Future<void> _load() async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -108,7 +109,7 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
     final mruRaw = await _storage.read(_kMruKey);
 
     // Pinned: comma-separated, [_kPinnedSlots] entries, empty string = null.
-    List<String?> pinned = List<String?>.filled(_kPinnedSlots, null);
+    final List<String?> pinned = List<String?>.filled(_kPinnedSlots, null);
     if (pinnedRaw != null && pinnedRaw.isNotEmpty) {
       final parts = pinnedRaw.split(',');
       for (int i = 0; i < _kPinnedSlots && i < parts.length; i++) {
@@ -182,7 +183,9 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
 
     final pinnedChanged = !_listEquals(pinned, state.pinned);
     final mruChanged = mru.length != state.mru.length;
-    if (!pinnedChanged && !mruChanged) return;
+    if (!pinnedChanged && !mruChanged) {
+      return;
+    }
 
     // Also drop any now-dangling ids from the live selection.
     final selected =
@@ -193,16 +196,22 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
   }
 
   static bool _listEquals(List<String?> a, List<String?> b) {
-    if (a.length != b.length) return false;
+    if (a.length != b.length) {
+      return false;
+    }
     for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
+      if (a[i] != b[i]) {
+        return false;
+      }
     }
     return true;
   }
 
   /// Record usage of the given album IDs (call after a successful sort action).
   void recordUsage(Iterable<String> albumIds) {
-    if (albumIds.isEmpty) return;
+    if (albumIds.isEmpty) {
+      return;
+    }
     final now = DateTime.now();
     final cutoff = now.subtract(_kMaxMruAge);
     final pinnedSet = state.pinned.whereType<String>().toSet();
@@ -212,7 +221,9 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
       for (final m in state.mru) m.albumId: m,
     };
     for (final id in albumIds) {
-      if (pinnedSet.contains(id)) continue; // pinned wins
+      if (pinnedSet.contains(id)) {
+        continue; // pinned wins
+      }
       mruMap[id] = QuickPickMru(albumId: id, lastUsed: now);
     }
 
@@ -223,7 +234,7 @@ class QuickPickNotifier extends StateNotifier<QuickPickState> {
       ..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
 
     state = state.copyWith(mru: nextMru.take(_kMruSlots).toList());
-    _persist();
+    unawaited(_persist());
   }
 
   // ── Persistence ───────────────────────────────────────────────────────────

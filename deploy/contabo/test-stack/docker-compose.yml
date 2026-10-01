@@ -1,0 +1,49 @@
+# Temporary Swimmich test stack on the Contabo VPS, next to prod: the CI-built :test image on a copy of
+# the prod database, on 127.0.0.1:2284. Runbook: README.md in this folder.
+#
+# Lives in /opt/immich-test, outside /opt/immich, so prod's deploy.sh and the nightly backup ignore it.
+# Safety: the prod library is mounted read-only and only the API worker runs (no background jobs), so
+# the test server can show prod's photos but never write to or delete prod's files. Every container and
+# hostname is distinct from prod's (the backup script dumps the container named immich-postgres).
+name: immich-test
+
+services:
+  immich-server:
+    container_name: immich-test-server
+    image: ${SWIMMICH_IMAGE}
+    volumes:
+      - /opt/immich/library:/data:ro
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    environment:
+      DB_HOSTNAME: immich-test-postgres
+      REDIS_HOSTNAME: immich-test-redis
+      # API only: thumbnail, metadata, deletion and ML jobs never run on the copy.
+      IMMICH_WORKERS_INCLUDE: api
+      # The mount check writes a marker file in each library folder, which a read-only mount refuses.
+      IMMICH_IGNORE_MOUNT_CHECK_ERRORS: 'true'
+    ports:
+      - '127.0.0.1:2284:2283'
+    depends_on:
+      - redis
+      - database
+    restart: 'no'
+
+  redis:
+    container_name: immich-test-redis
+    image: docker.io/valkey/valkey:9@sha256:3b55fbaa0cd93cf0d9d961f405e4dfcc70efe325e2d84da207a0a8e6d8fde4f9
+    restart: 'no'
+
+  database:
+    container_name: immich-test-postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    shm_size: 128mb
+    restart: 'no'

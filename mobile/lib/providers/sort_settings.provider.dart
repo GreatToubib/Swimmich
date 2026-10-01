@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/repositories/secure_storage.repository.dart';
 
@@ -8,14 +10,16 @@ const _kDeleteLocalKey = 'swimmich.sort.deleteLocalOnSort';
 /// own trash toggle from this value and can override it per card.
 class DeleteLocalOnSortNotifier extends StateNotifier<bool> {
   DeleteLocalOnSortNotifier(this._storage) : super(true) {
-    _load();
+    unawaited(_load());
   }
 
   final SecureStorageRepository _storage;
 
   Future<void> _load() async {
     final raw = await _storage.read(_kDeleteLocalKey);
-    if (raw != null) state = raw == 'true';
+    if (raw != null) {
+      state = raw == 'true';
+    }
   }
 
   Future<void> set(bool value) async {

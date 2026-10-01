@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -49,7 +50,7 @@ class SortFilterState {
       );
 
   Map<String, dynamic> toJson() => {
-        'statuses': statuses.map((s) => s.value).toList(),
+        'statuses': statuses.map((s) => s.toJson()).toList(),
         'noAlbum': noAlbum,
         'albumIds': albumIds.toList(),
       };
@@ -82,7 +83,9 @@ class SortFilterNotifier extends StateNotifier<SortFilterState> {
 
   Future<void> _load() async {
     final raw = await _storage.read(_kFilterKey);
-    if (raw == null || raw.isEmpty) return;
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
     try {
       state = SortFilterState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
@@ -94,45 +97,53 @@ class SortFilterNotifier extends StateNotifier<SortFilterState> {
   void toggleStatus(SortStatus status) {
     final next = Set<SortStatus>.from(state.statuses);
     if (next.contains(status)) {
-      if (next.length == 1) return; // keep ≥1 status
+      if (next.length == 1) {
+        return; // keep ≥1 status
+      }
       next.remove(status);
     } else {
       next.add(status);
     }
     state = state.copyWith(statuses: next);
-    _persist();
+    unawaited(_persist());
   }
 
   /// Toggle the "No album" option; refuses to empty the album section.
   void toggleNoAlbum() {
-    if (state.noAlbum && state.albumIds.isEmpty) return; // keep ≥1 album option
+    if (state.noAlbum && state.albumIds.isEmpty) {
+      return; // keep ≥1 album option
+    }
     state = state.copyWith(noAlbum: !state.noAlbum);
-    _persist();
+    unawaited(_persist());
   }
 
   /// Toggle a specific album; refuses to empty the album section.
   void toggleAlbum(String albumId) {
     final next = Set<String>.from(state.albumIds);
     if (next.contains(albumId)) {
-      if (next.length == 1 && !state.noAlbum) return; // keep ≥1 album option
+      if (next.length == 1 && !state.noAlbum) {
+        return; // keep ≥1 album option
+      }
       next.remove(albumId);
     } else {
       next.add(albumId);
     }
     state = state.copyWith(albumIds: next);
-    _persist();
+    unawaited(_persist());
   }
 
   /// Drop album ids that no longer exist on the server.
   void pruneAlbums(Set<String> existingIds) {
     final kept = state.albumIds.where(existingIds.contains).toSet();
-    if (kept.length == state.albumIds.length) return;
+    if (kept.length == state.albumIds.length) {
+      return;
+    }
     // Never let the album section go empty.
     state = state.copyWith(
       albumIds: kept,
       noAlbum: kept.isEmpty ? true : state.noAlbum,
     );
-    _persist();
+    unawaited(_persist());
   }
 
   Future<void> _persist() =>

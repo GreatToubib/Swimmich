@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { AssetTypeEnum, AssetVisibility, type AssetResponseDto, type StackResponseDto } from '@immich/sdk';
+import { AssetTypeEnum, AssetVisibility, SortStatus, type AssetResponseDto, type StackResponseDto } from '@immich/sdk';
 import { BrowserContext } from '@playwright/test';
 import { randomPreview, randomThumbnail } from 'src/ui/generators/timeline';
 
@@ -75,6 +75,7 @@ export const createMockStackAsset = (ownerId: string): AssetResponseDto => {
     width: 3000,
     height: 4000,
     isEdited: false,
+    sortStatus: SortStatus.New,
   };
 };
 

@@ -4,7 +4,7 @@ Project instructions for Claude. Read `SWIMMICH.md` for the narrative project/
 release recap. This file is the operational "house rules."
 
 ## What this is
-- A personal **fork of [Immich](https://github.com/immich-app/immich)** (self-hosted photo manager), tracking tag **v3.0.3** (migrated from v2.7.5 on 2026-07-27).
+- A personal **fork of [Immich](https://github.com/immich-app/immich)** (self-hosted photo manager), tracking tag **v3.2.4** (from v3.0.3 on 2026-10-01; v2.7.5 → v3.0.3 on 2026-07-27).
 - Swimmich adds a Tinder-style **photo triage / "sort deck"** to the mobile app (`mobile/`).
 - Solo developer. Goal loop: branch → build to phone → ready-to-merge PR.
 
@@ -12,9 +12,13 @@ release recap. This file is the operational "house rules."
 - **Repo root:** `C:\Users\basil\dev\Swimmich Stack\Swimmich app`
 - **Flutter app:** `mobile/`
 - **Flutter SDK:** `C:\Users\basil\dev\dev-tools\flutter` (call `…\flutter\bin\flutter.bat`)
-  - Pinned to **exactly 3.44.1** (detached tag checkout, so `flutter --version`
-    reports channel `[user-branch]`). `mobile/pubspec.yaml` pins `flutter: 3.44.1`
-    as an exact match — 3.44.8 is rejected. Do not run `flutter upgrade`.
+  - Pinned to an exact version (detached tag checkout, so `flutter --version`
+    reports channel `[user-branch]`). Do not run `flutter upgrade`.
+  - Since the v3.2.4 upgrade `mobile/pubspec.yaml` pins **`flutter: 3.47.1`** (exact
+    match; `mobile/packages/ui` also needs Dart ≥ 3.13). Switch the checkout with
+    `git -C C:\Users\basil\dev\dev-tools\flutter fetch origin tag 3.47.1 --no-tags`,
+    then `git -C … checkout 3.47.1` and `flutter --version` (downloads the engine).
+    Branches still on v3.0.3 need 3.44.1.
   - The folder was renamed from `dev tools` → `dev-tools` on 2026-07-27: the space
     broke Dart's native-assets build hooks (the hook runner invokes `dart.exe`
     unquoted, splitting the path), which blocked i18n codegen and `build_runner`.
@@ -27,14 +31,25 @@ release recap. This file is the operational "house rules."
 
 ## Building & codegen (Windows / PowerShell)
 - Run Flutter via the **full `flutter.bat` path** in PowerShell (MSYS2/bash `build_runner` fails).
-- If `build_runner` / `router.gr.dart` output is stale, delete `mobile\.dart_tool\build` and re-run.
-- Run `dart analyze` before committing.
+- Since v3.2.4 upstream commits **no generated mobile code**: the OpenAPI Dart client
+  (`mobile/generated/openapi`), `router.gr.dart`, `*.g.dart`, `*.drift.dart`, the
+  translation keys and the pigeon files are all gitignored. After a checkout, regenerate:
+  1. Dart client (needs Java + Node, so run it in Docker; `git archive` avoids CRLF
+     breaking the generator's patch files). From the repo root:
+     `git -c core.autocrlf=false archive -o $env:TEMP\oa.tar HEAD open-api`, then
+     `docker run --rm -v "$env:TEMP\oa.tar:/oa.tar:ro" -v "${PWD}\mobile:/out" node:24.15.0 bash -c "tar -xf /oa.tar -C / && apt-get update -qq && apt-get install -y -qq openjdk-17-jre-headless >/dev/null && npm i -g @openapitools/openapi-generator-cli@2.40.1 >/dev/null && cd /open-api && bash ./bin/generate-dart-sdk.sh && rm -rf /out/generated && cp -r /mobile/generated /out/"`
+  2. In `mobile\`: `flutter pub get`, then `dart run pigeon --input <file>` for each
+     `pigeon\*.dart` (also writes the Kotlin/Swift halves the Android build needs),
+     `dart run easy_localization:generate -S ..\i18n`,
+     `dart run bin\generate_keys.dart`, `dart run drift_dev make-migrations`,
+     `dart run build_runner build` (same chain as upstream's `mobile/mise.toml` `codegen`).
+- If `build_runner` output is stale, delete `mobile\.dart_tool\build` and re-run.
+- Run `dart analyze --fatal-infos` before committing (upstream's level; v3.2 enforces
+  braces on one-line `if` bodies and `unawaited(...)` for fire-and-forget futures).
 
 ## Generated-files rule (CRITICAL)
-- Only `git add` **deliberate source edits**. Never stage the dozens of
-  `*.g.dart`, `*.g.kt`, `*.g.swift`, or `*.drift.dart` files.
-- **Exception:** `mobile/lib/routing/router.gr.dart` (auto_route artifact) **must**
-  be committed — the app won't compile without it.
+- Only `git add` **deliberate source edits**. Never stage generated files
+  (`*.g.dart`, `*.g.kt`, `*.g.swift`, `*.drift.dart`, `router.gr.dart`, `mobile/generated/`).
 - Also never stage: `mobile/android/local.properties`, `mobile/pubspec.lock`, `.claude/`.
 
 ## Android release
@@ -58,22 +73,33 @@ release recap. This file is the operational "house rules."
   "unrated", so `setSortStatus` maps 0 → null.
 - Immich metadata search **ANDs** `albumIds` (intersection, not OR) — to load a
   union across albums, query each album separately and merge/dedupe.
+- v3.2 deprecated the flat search fields (`albumIds`, `page`, ...) in favour of a
+  `filter` tree; the two shapes cannot be mixed. The sort deck still sends flat
+  `MetadataSearchDto`s, and the fork's `sortStatus` filter exists **only** in the flat
+  shape. Port both to `filter` before upstream drops the flat fields (v4).
+- Server search results select an explicit column list (`columns.searchAsset` in
+  `server/src/database.ts`); a new asset column the API returns must be added there.
+- Generated OpenAPI enums are Dart enums with a private value: use `toJson()`, not `.value`.
+- **DB migrations:** never renumber a fork migration once it has run on prod (Kysely
+  then refuses to boot: "previously executed migration ... is missing"). On every
+  upstream bump, check that no *new* upstream migration sorts below an applied fork
+  migration. Number a new fork migration just above the newest upstream one and list
+  it in `server/src/schema/migrations/ORDER` (checked by `sql-tools migrations verify-order`).
 
 ## Servers
 - Local dev: Docker Desktop, then `cd ~/immich-app && docker compose up -d`.
-- **Deployed on the OVH VPS (141.94.77.202) since 2026-05** — **one live stack**:
-  | Env  | Branch     | URL                                 | Port |
-  |------|------------|-------------------------------------|------|
-  | prod | `swimmich` | https://swimmich.azestysolution.com | 2283 |
-- The **test stack was decommissioned 2026-07-28** to reclaim disk on the shared
-  VPS. `swimmich-test` is still the integration branch — keep branching from it
-  and opening PRs into it; only the *server* went away. CI still builds the
-  `:test` image, and the DNS record is kept, so it can be restored cheaply.
-  Restore steps are in `..\CLAUDE.md`.
-- Connect as **`ssh swimmich`** (unprivileged user `basil`). `ssh ovh` is root
-  break-glass — don't use it without asking.
+- **Prod runs on the Contabo VPS since 2026-10-01** (`ssh contabo`, stack in `/opt/immich`):
+  | Env  | Branch     | URL                                 | Port (127.0.0.1) |
+  |------|------------|-------------------------------------|------------------|
+  | prod | `swimmich` | https://swimmich.azestysolution.com | 2283             |
+- Runbook: `deploy/contabo/README.md`. Deploy (only with Basil's OK) =
+  `ssh contabo /opt/immich/src/deploy/contabo/deploy.sh` once CI has built `:prod`; it
+  takes a pre-deploy `pg_dumpall` first. Nightly restic backups run at 03:00.
+- A temporary test stack (prod DB copy + the `:test` image on 127.0.0.1:2284) can be
+  brought up next to prod: `deploy/contabo/test-stack/README.md`.
+- `swimmich-test` is still the integration branch — keep branching from it and opening
+  PRs into it. CI builds `:test` on every push to it.
 - Images build in GitHub Actions → `ghcr.io/greattoubib/swimmich-server`; the VPS
-  only pulls. prod is manual via `~/swimmich/deploy.sh prod`.
-- Disk is tight — the box is **shared with junior**. Check `df -h /home/basil`
-  before anything that writes.
-- Full deploy/CI/Caddy runbook: `..\CLAUDE.md` (the `Swimmich Stack` root).
+  only pulls.
+- The old OVH VPS (141.94.77.202) is Junior's shared host: its Swimmich stack is
+  stopped with the data kept. Do not touch it.

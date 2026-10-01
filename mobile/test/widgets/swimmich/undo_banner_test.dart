@@ -2,16 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 
+// The timings below are pinned rather than taken from the banner's defaults
+// (the default visible time was raised to 2000ms after these tests were written).
+// The button is centred so a tap that passes through a fading banner does not
+// land on it and show a new banner.
 Widget _host(VoidCallback onShow, VoidCallback onUndo) {
   return MaterialApp(
-    home: Builder(
-      builder: (context) => TextButton(
-        onPressed: () => showSwimmichUndoBanner(
-          context,
-          message: 'Photo deleted',
-          onUndo: onUndo,
+    home: Scaffold(
+      body: Center(
+        child: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showSwimmichUndoBanner(
+              context,
+              message: 'Photo deleted',
+              onUndo: onUndo,
+              visible: const Duration(milliseconds: 800),
+              fadeOut: const Duration(milliseconds: 200),
+            ),
+            child: const Text('DELETE'),
+          ),
         ),
-        child: const Text('DELETE'),
       ),
     ),
   );
@@ -52,8 +62,11 @@ void main() {
       // Check IgnorePointer is active during fade — tap should not call undo.
       var undoCalledDuringFade = false;
       await tester.pumpWidget(_host(() {}, () => undoCalledDuringFade = true));
-      // Re-show so the new callback is wired in.
+      // Re-show so the new callback is wired in. This replaces the fading banner,
+      // whose disposal must not cancel the new banner's timers.
       await tester.tap(find.text('DELETE'));
+      // Build the new banner first: pump(duration) elapses time before the frame.
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 900));
       // Tapping UNDO during fade should be a no-op (IgnorePointer).
       await tester.tap(find.text('UNDO'), warnIfMissed: false);
