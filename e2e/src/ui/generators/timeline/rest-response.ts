@@ -6,6 +6,7 @@ import {
   AlbumUserRole,
   AssetTypeEnum,
   AssetVisibility,
+  SortStatus,
   UserAvatarColor,
   type AlbumResponseDto,
   type AssetResponseDto,
@@ -344,6 +345,7 @@ export function toAssetResponseDto(asset: MockTimelineAsset, owner?: UserRespons
     width: exifInfo.exifImageWidth ?? 1,
     height: exifInfo.exifImageHeight ?? 1,
     isEdited: false,
+    sortStatus: SortStatus.New,
   };
 }
 
