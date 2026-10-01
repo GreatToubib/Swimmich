@@ -9,6 +9,7 @@ import semver from 'semver';
 import {
   EXTENSION_NAMES,
   POSTGRES_VERSION_RANGE,
+  serverVersion,
   VECTOR_EXTENSIONS,
   VECTOR_INDEX_TABLES,
   VECTOR_VERSION_RANGE,
@@ -192,9 +193,8 @@ export class DatabaseRepository {
               ) {
                 probes[indexName] = this.targetProbeCount(targetLists);
                 return this.reindexVectors(indexName, { lists: targetLists });
-              } else {
-                probes[indexName] = this.targetProbeCount(lists);
               }
+              probes[indexName] = this.targetProbeCount(lists);
             }),
           );
           break;
@@ -228,7 +228,7 @@ export class DatabaseRepository {
       if (table === 'smart_search') {
         await sql`ALTER TABLE ${sql.raw(table)} DROP CONSTRAINT IF EXISTS dim_size_constraint`.execute(tx);
       }
-      if (!rows.some((row) => row.columnName === 'embedding')) {
+      if (rows.every((row) => row.columnName !== 'embedding')) {
         this.logger.warn(`Column 'embedding' does not exist in table '${table}', truncating and adding column.`);
         await sql`TRUNCATE TABLE ${sql.raw(table)}`.execute(tx);
         await sql`ALTER TABLE ${sql.raw(table)} ADD COLUMN embedding real[] NOT NULL`.execute(tx);
@@ -240,12 +240,21 @@ export class DatabaseRepository {
         SET DATA TYPE vector(${sql.raw(String(dimSize))})`.execute(tx);
       await sql.raw(vectorIndexQuery({ vectorExtension, table, indexName, lists })).execute(tx);
     });
-    try {
-      await sql`VACUUM ANALYZE ${sql.raw(table)}`.execute(this.db);
-    } catch (error: any) {
-      this.logger.warn(`Failed to vacuum table '${table}'. The DB will temporarily use more disk space: ${error}`);
-    }
     this.logger.log(`Reindexed ${indexName}`);
+    void this.vacuum({ table }).catch((error) => this.logger.warn(`Failed to vacuum ${table}: ${error}`));
+  }
+
+  async vacuum({ analyze = false, table }: { analyze?: boolean; table?: keyof DB } = {}): Promise<void> {
+    try {
+      await sql`VACUUM ${sql.raw(analyze ? 'ANALYZE' : '')} ${sql.raw(table ?? '')}`.execute(this.db);
+    } catch (error) {
+      this.logger.warn(`Failed to vacuum ${table || 'database'}: ${error}`);
+      this.logger.warn('If using Docker, consider increasing shm_size for the database.');
+    }
+  }
+
+  reindex(table: keyof DB, { concurrently = false } = {}): Promise<unknown> {
+    return sql`REINDEX TABLE ${sql.raw(concurrently ? 'CONCURRENTLY' : '')} ${sql.raw(table)}`.execute(this.db);
   }
 
   private async getDatabaseName(): Promise<string> {
@@ -349,11 +358,9 @@ export class DatabaseRepository {
   private targetListCount(count: number) {
     if (count < 128_000) {
       return 1;
-    } else if (count < 2_048_000) {
-      return 1 << (32 - Math.clz32(count / 1000));
-    } else {
-      return 1 << (33 - Math.clz32(Math.sqrt(count)));
     }
+    // eslint-disable-next-line unicorn/prefer-minimal-ternary
+    return count < 2_048_000 ? 1 << (32 - Math.clz32(count / 1000)) : 1 << (33 - Math.clz32(Math.sqrt(count)));
   }
 
   private targetProbeCount(lists: number) {
@@ -368,29 +375,39 @@ export class DatabaseRepository {
     return count;
   }
 
-  async runMigrations(): Promise<void> {
+  async runMigrations(): Promise<number> {
     this.logger.log('Running migrations');
 
     const migrator = this.createMigrator();
 
-    const { error, results } = await migrator.migrateToLatest();
+    const { error, results = [] } = await migrator.migrateToLatest();
 
-    for (const result of results ?? []) {
+    for (const result of results) {
       if (result.status === 'Success') {
         this.logger.log(`Migration "${result.migrationName}" succeeded`);
-      }
-
-      if (result.status === 'Error') {
+      } else if (result.status === 'Error') {
         this.logger.warn(`Migration "${result.migrationName}" failed`);
       }
     }
 
     if (error) {
       this.logger.error(`Migrations failed: ${error}`);
+
+      const missing =
+        error instanceof Error ? error.message.match(/previously executed migration (.+) is missing/u) : null;
+      if (missing) {
+        throw new Error(
+          `Migration "${missing[1]}" was already applied to this database but is not in this version of Immich (${serverVersion}). ` +
+            `This usually means the database was migrated by a newer version. Downgrades are not supported.`,
+          { cause: error },
+        );
+      }
+
       throw error;
     }
 
     this.logger.log('Finished running migrations');
+    return results.length;
   }
 
   async migrateFilePaths(sourceFolder: string, targetFolder: string): Promise<void> {
@@ -474,37 +491,6 @@ export class DatabaseRepository {
 
   private async releaseLock(lock: DatabaseLock, connection: Kysely<DB>): Promise<void> {
     await sql`SELECT pg_advisory_unlock(${lock})`.execute(connection);
-  }
-
-  async revertLastMigration(): Promise<string | undefined> {
-    this.logger.debug('Reverting last migration');
-
-    const migrator = this.createMigrator();
-    const { error, results } = await migrator.migrateDown();
-
-    for (const result of results ?? []) {
-      if (result.status === 'Success') {
-        this.logger.log(`Reverted migration "${result.migrationName}"`);
-      }
-
-      if (result.status === 'Error') {
-        this.logger.warn(`Failed to revert migration "${result.migrationName}"`);
-      }
-    }
-
-    if (error) {
-      this.logger.error(`Failed to revert migrations: ${error}`);
-      throw error;
-    }
-
-    const reverted = results?.find((result) => result.direction === 'Down' && result.status === 'Success');
-    if (!reverted) {
-      this.logger.debug('No migrations to revert');
-      return undefined;
-    }
-
-    this.logger.debug('Finished reverting migration');
-    return reverted.migrationName;
   }
 
   private createMigrator(): Migrator {
