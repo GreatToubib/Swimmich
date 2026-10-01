@@ -10,6 +10,7 @@ CI builds the image (`ghcr.io/greattoubib/swimmich-server:prod`) on every push t
 | `/opt/immich/.env` | from `.env.example`, holds the DB password (never committed) |
 | `/opt/immich/library`, `/opt/immich/postgres` | photos and database |
 | `/opt/caddy/sites/immich.caddy` | copy of `immich.caddy` (HTTPS) |
+| `/etc/cron.d/immich-tag-mycamera` | runs `tag-mycamera.sh` at 01:30 (API key in `/opt/immich/secrets/mycamera-curlrc`, never committed) |
 
 - Deploy: push to `swimmich`, wait for the `:prod` build, then `ssh contabo /opt/immich/src/deploy/contabo/deploy.sh`.
 - Rollback: set `SWIMMICH_IMAGE` in `/opt/immich/.env` to an older `:prod-<sha>` tag and run `deploy.sh` again.
