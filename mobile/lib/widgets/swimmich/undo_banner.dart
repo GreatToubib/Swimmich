@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 OverlayEntry? _currentEntry;
-Timer? _fadeTimer;
-Timer? _removeTimer;
 
 void showSwimmichUndoBanner(
   BuildContext context, {
@@ -13,17 +11,17 @@ void showSwimmichUndoBanner(
   Duration visible = const Duration(milliseconds: 2000),
   Duration fadeOut = const Duration(milliseconds: 200),
 }) {
-  _currentEntry?.remove();
-  _fadeTimer?.cancel();
-  _removeTimer?.cancel();
-  _currentEntry = null;
-  _fadeTimer = null;
-  _removeTimer = null;
+  final previous = _currentEntry;
+  if (previous != null) {
+    _removeEntry(previous);
+  }
 
-  final entry = OverlayEntry(
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
     builder: (context) => _UndoBanner(
       message: message,
       onUndo: onUndo,
+      onDismiss: () => _removeEntry(entry),
       visible: visible,
       fadeOut: fadeOut,
     ),
@@ -33,25 +31,29 @@ void showSwimmichUndoBanner(
   Overlay.of(context).insert(entry);
 }
 
-void _clearCurrent() {
-  _fadeTimer?.cancel();
-  _removeTimer?.cancel();
-  _currentEntry?.remove();
-  _fadeTimer = null;
-  _removeTimer = null;
+/// Removes [entry] only while it is still the current banner. A replaced banner
+/// stays alive until the next frame, so its timer could otherwise fire and
+/// remove its successor.
+void _removeEntry(OverlayEntry entry) {
+  if (!identical(_currentEntry, entry)) {
+    return;
+  }
   _currentEntry = null;
+  entry.remove();
 }
 
 class _UndoBanner extends StatefulWidget {
   const _UndoBanner({
     required this.message,
     required this.onUndo,
+    required this.onDismiss,
     required this.visible,
     required this.fadeOut,
   });
 
   final String message;
   final VoidCallback onUndo;
+  final VoidCallback onDismiss;
   final Duration visible;
   final Duration fadeOut;
 
@@ -62,26 +64,36 @@ class _UndoBanner extends StatefulWidget {
 class _UndoBannerState extends State<_UndoBanner> {
   bool _fading = false;
   bool _dismissed = false;
+  // Owned by this banner: a replaced banner is disposed one frame after its
+  // successor's initState, so shared timers would be cancelled from under it.
+  Timer? _fadeTimer;
+  Timer? _removeTimer;
 
   @override
   void initState() {
     super.initState();
     _fadeTimer = Timer(widget.visible, () {
-      if (mounted) setState(() => _fading = true);
+      if (mounted) {
+        setState(() => _fading = true);
+      }
     });
     _removeTimer = Timer(widget.visible + widget.fadeOut, _remove);
   }
 
   void _remove() {
-    if (_dismissed) return;
+    if (_dismissed) {
+      return;
+    }
     _dismissed = true;
-    _clearCurrent();
+    widget.onDismiss();
   }
 
   void _handleUndo() {
-    if (_dismissed) return;
+    if (_dismissed) {
+      return;
+    }
     _dismissed = true;
-    _clearCurrent();
+    widget.onDismiss();
     widget.onUndo();
   }
 
