@@ -15,8 +15,8 @@ install -m 644 src/deploy/contabo/docker-compose.yml docker-compose.yml
 echo ">> database dump before the update (3 last kept in $STACK/backups)"
 mkdir -p backups
 docker exec immich-postgres pg_dumpall --clean --if-exists -U postgres | gzip > "backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"
-find backups -maxdepth 1 -name 'pre-deploy-*.sql.gz' -printf '%T@ %p
-' | sort -rn | tail -n +4 | cut -d' ' -f2- \n  | xargs -r rm --
+find backups -maxdepth 1 -name 'pre-deploy-*.sql.gz' -printf '%T@ %p\n' | sort -rn | tail -n +4 | cut -d' ' -f2- \
+  | xargs -r rm --
 
 echo ">> pulling images"
 docker compose pull -q
