@@ -1,0 +1,13 @@
+# Swimmich public site, served by Caddy (/opt/caddy/sites/immich.caddy).
+# DNS: swimmich.azestysolution.com -> 167.86.115.97 (Cloudflare, proxy off).
+swimmich.azestysolution.com {
+	reverse_proxy immich-server:2283 {
+		transport http {
+			read_timeout 600s
+		}
+	}
+	request_body {
+		max_size 50GB
+	}
+	encode zstd gzip
+}
