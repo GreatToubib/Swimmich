@@ -1,5 +1,11 @@
 import { faker } from '@faker-js/faker';
-import { AssetTypeEnum, AssetVisibility, type AssetResponseDto, type TimeBucketAssetResponseDto } from '@immich/sdk';
+import {
+  AssetTypeEnum,
+  AssetVisibility,
+  SortStatus,
+  type AssetResponseDto,
+  type TimeBucketAssetResponseDto,
+} from '@immich/sdk';
 import { Sync } from 'factory.ts';
 import type { TimelineAsset } from '$lib/managers/timeline-manager/types';
 import { fromISODateTimeUTCToObject, fromTimelinePlainDateTime } from '$lib/utils/timeline-util';
@@ -29,6 +35,7 @@ export const assetFactory = Sync.makeFactory<AssetResponseDto>({
   width: faker.number.int({ min: 100, max: 1000 }),
   height: faker.number.int({ min: 100, max: 1000 }),
   isEdited: false,
+  sortStatus: SortStatus.New,
 });
 
 export const timelineAssetFactory = Sync.makeFactory<TimelineAsset>({

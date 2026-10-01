@@ -418,10 +418,7 @@ export enum SortStatus {
   Kept = 'kept',
 }
 
-export const SortStatusSchema = z
-  .enum(SortStatus)
-  .describe('Swimmich sort/triage status')
-  .meta({ id: 'SortStatus' });
+export const SortStatusSchema = z.enum(SortStatus).describe('Swimmich sort/triage status').meta({ id: 'SortStatus' });
 
 export enum SourceType {
   MachineLearning = 'machine-learning',
