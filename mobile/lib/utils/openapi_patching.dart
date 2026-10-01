@@ -34,7 +34,8 @@ final Map<String, Map<String, Object?>> openApiPatches = {
     'minFaces': 3,
   },
   'UserResponseDto': {'profileChangedAt': _now},
-  'AssetResponseDto': {'visibility': 'timeline', 'createdAt': _now, 'isEdited': false},
+  // sortStatus: Swimmich (an asset without one is unsorted, like the DB default)
+  'AssetResponseDto': {'visibility': 'timeline', 'createdAt': _now, 'isEdited': false, 'sortStatus': 'new'},
   'UserAdminResponseDto': {'profileChangedAt': _now, 'clusterGroupId': ''},
   'LoginResponseDto': {'isOnboarded': false},
   'SyncUserV1': {'profileChangedAt': _now, 'hasProfileImage': false},
