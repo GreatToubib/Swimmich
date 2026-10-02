@@ -12,13 +12,12 @@ release recap. This file is the operational "house rules."
 - **Repo root:** `C:\Users\basil\dev\Swimmich Stack\Swimmich app`
 - **Flutter app:** `mobile/`
 - **Flutter SDK:** `C:\Users\basil\dev\dev-tools\flutter` (call `…\flutter\bin\flutter.bat`)
-  - Pinned to an exact version (detached tag checkout, so `flutter --version`
-    reports channel `[user-branch]`). Do not run `flutter upgrade`.
-  - Since the v3.2.4 upgrade `mobile/pubspec.yaml` pins **`flutter: 3.47.1`** (exact
-    match; `mobile/packages/ui` also needs Dart ≥ 3.13). Switch the checkout with
-    `git -C C:\Users\basil\dev\dev-tools\flutter fetch origin tag 3.47.1 --no-tags`,
-    then `git -C … checkout 3.47.1` and `flutter --version` (downloads the engine).
-    Branches still on v3.0.3 need 3.44.1.
+  - A shallow checkout of tag **3.47.1**, the exact version `mobile/pubspec.yaml`
+    pins since the v3.2.4 upgrade (`flutter --version` reports channel `[user-branch]`).
+    Do not run `flutter upgrade`. It is the only Flutter SDK on the PC (the 3.44.1 one
+    was removed on 2026-10-02). When upstream bumps the pin, move it with
+    `git -C C:\Users\basil\dev\dev-tools\flutter fetch --depth 1 origin tag <version> --no-tags`,
+    then `git -C … checkout <version>` and `flutter --version` (downloads the engine).
   - The folder was renamed from `dev tools` → `dev-tools` on 2026-07-27: the space
     broke Dart's native-assets build hooks (the hook runner invokes `dart.exe`
     unquoted, splitting the path), which blocked i18n codegen and `build_runner`.
