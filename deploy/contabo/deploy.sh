@@ -23,6 +23,18 @@ docker compose pull -q
 echo ">> recreating the stack"
 docker compose up -d --remove-orphans
 
+# Compose does not always notice that the mutable :prod tag now points at a new image (seen with
+# Compose 5.5.1 on 2026-10-02: "up -d" kept the old container and the deploy looked fine). Compare
+# the running server image with the pulled one and recreate the server explicitly when they differ.
+image=$(sed -n 's/^SWIMMICH_IMAGE=//p' .env)
+wanted=$(docker image inspect "$image" --format '{{.Id}}')
+running=$(docker inspect immich-server --format '{{.Image}}' 2>/dev/null || true)
+if [ "$running" != "$wanted" ]; then
+  echo ">> compose kept the previous server image, recreating immich-server"
+  docker compose up -d --force-recreate --no-deps immich-server
+fi
+echo ">> server image: $image (${wanted#sha256:})" | cut -c1-120
+
 for _ in $(seq 1 40); do
   if curl -fsS http://127.0.0.1:2283/api/server/ping >/dev/null 2>&1; then
     echo ">> OK: Immich answers on 127.0.0.1:2283"
