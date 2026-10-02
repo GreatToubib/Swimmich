@@ -118,6 +118,12 @@ class SortQueueNotifier extends AsyncNotifier<SortQueueState> {
         final resp = await search.searchAssets(
           MetadataSearchDto(
             sortStatus: Optional.present(spec.status),
+            // Photos only: the deck shows a still image, so a video card would
+            // be a frame, or black for the hidden video half of a motion photo.
+            type: const Optional.present(AssetTypeEnum.IMAGE),
+            // Without this the server returns everything but the locked folder,
+            // including hidden and archived assets.
+            visibility: const Optional.present(AssetVisibility.timeline),
             albumIds: Optional.present(spec.albumId != null ? [spec.albumId!] : const []),
             // Must stay absent (omitted) rather than an explicit null when the
             // filter is off: v3's client serialises Optional.present(null) as
