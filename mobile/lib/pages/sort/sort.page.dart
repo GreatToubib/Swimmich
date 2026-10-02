@@ -27,6 +27,16 @@ import 'package:immich_mobile/widgets/swimmich/sort_app_bar.dart';
 import 'package:immich_mobile/widgets/swimmich/undo_banner.dart';
 import 'package:openapi/api.dart';
 
+/// Same rule as RemoteAsset.playbackStyle: an image with a duration is animated
+/// (GIF, animated WebP). Motion photos are not: treating them as animated made
+/// the card download the full original of each one.
+bool _isAnimatedImage(AssetResponseDto asset) {
+  if (asset.type != AssetTypeEnum.IMAGE) {
+    return false;
+  }
+  return (asset.duration ?? 0) > 0;
+}
+
 AssetType _toAssetType(AssetTypeEnum t) => switch (t) {
       AssetTypeEnum.IMAGE => AssetType.image,
       AssetTypeEnum.VIDEO => AssetType.video,
@@ -687,10 +697,7 @@ class _SortDeckViewState extends ConsumerState<_SortDeckView>
               assetId: widget.asset.id,
               thumbhash: widget.asset.thumbhash ?? '',
               assetType: _toAssetType(widget.asset.type),
-              // `livePhotoVideoId` is an Optional in the v3 client, so a bare
-              // `!= null` would be unconditionally true and render every card as
-              // animated. The analyzer flags this only as a warning, not an error.
-              isAnimated: widget.asset.livePhotoVideoId.orElse(null) != null,
+              isAnimated: _isAnimatedImage(widget.asset),
             ),
             fit: BoxFit.contain,
           ),

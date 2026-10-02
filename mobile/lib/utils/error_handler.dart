@@ -4,11 +4,18 @@ import 'package:flutter/widgets.dart';
 import 'package:immich_mobile/generated/translations.g.dart';
 import 'package:immich_mobile/utils/debug_print.dart';
 import 'package:immich_ui/immich_ui.dart';
+import 'package:logging/logging.dart';
 import 'package:openapi/api.dart';
 // ignore: depend_on_referenced_packages
 import 'package:stack_trace/stack_trace.dart';
 
+// Swimmich: also keep the error in the app's own log (Settings > Logs), so a
+// failure in a release build can be read back; upstream only prints it in debug.
+final _log = Logger('ErrorHandler');
+
 void handleError(Object error, {StackTrace? stack, String? description}) {
+  _log.severe(description ?? 'Unhandled error', error, stack);
+
   String? stackTrace;
   if (stack != null) {
     final trace = Trace.from(stack);
